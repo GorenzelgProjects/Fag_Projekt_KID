@@ -44,7 +44,7 @@ class EEG():
         return 0
 
 
-    def mm_normalize(self,raw_matrix):
+    def mm_normalize(self,raw_matrix): ##Consider how to normalize data (e.g. over each electrode, over each patient etc.)
 
         
         a_min = raw_matrix.min(axis=(1), keepdims=True)
@@ -83,3 +83,5 @@ fig, axs = plt.subplots(3,1)
 
 axs[0].plot(raw_matrix[0,:,0], raw_matrix[0,:,1], color="b")
 plt.show()
+
+
