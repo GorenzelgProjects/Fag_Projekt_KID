@@ -12,6 +12,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 import math
 
+'''Helper class to save important analytical data from each training of our CNN-AE, such as architecture, hyperparameters,
+pytorch files of the architecture, plots and performance into a subfolder. The "Savedata"-class will mainly be used in conjunction
+with the "CNN_BO.py" file, to save each instance of our Bayesian Optimization of the CNN-AE most important features,
+such as performance of the train and test data, as describes above.
+'''
+
 class SaveData:
     def __init__(self, architecture=[],hyperparameter=[],encoder=None,decoder=None,plots=None, folder_name=None, relative_path="./data"):
         self.architecture = architecture
@@ -22,27 +28,25 @@ class SaveData:
         self.folder_name = folder_name
         self.relative_path = relative_path
     
-    def save_data_to_txt(self,save_architecture=False):
-        # If dict doesn't exist, create new folder
+    def save_data_to_txt(self,save_architecture=False): # If dict doesn't exist, create new folder.
         if self.folder_name:
             directory = os.path.join(self.relative_path, self.folder_name)
             if not os.path.exists(directory):
-                os.makedirs(directory)
+                os.makedirs(directory)                  # If folder do not exist, creates new folder.
         else:
-            directory = self.relative_path
+            directory = self.relative_path              # If folder do exists, set dictionary to folder location.
 
-        # Create a new .txt at the directory
-        file_name = "data.txt"
-        file_path = os.path.join(directory, file_name)
+    
+        file_name = "data.txt"                          # Gives the .txt a filename.
+        file_path = os.path.join(directory, file_name)  # Creates .txt at the directory with the given filename.
 
-        with open(file_path, "w") as f:
-            # Write each item in the list to a new line in the file
+        with open(file_path, "w") as f:                 # Writes each item (architecture or hyperparameter) in the list to a new line in the file.
             f.write(str("Architecture:")+ "\n" + "\n")
-            for item in self.architecture:
-                f.write(str(item) + "\n")
+            for architecture in self.architecture:      # Which saves the architecture or hyperparameter in the given file at the dictionary location.
+                f.write(str(architecture) + "\n")
             f.write(str("Hyperparameters:")+ "\n" + "\n")
-            for item in self.hyperparameter:
-                f.write(str(item) + "\n")
+            for hyperparameter in self.hyperparameter:
+                f.write(str(hyperparameter) + "\n")
 
         if save_architecture==True:
             file_name = ["decoder.pt","encoder.pt"]
