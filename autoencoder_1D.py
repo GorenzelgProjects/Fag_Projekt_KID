@@ -7,20 +7,21 @@ import math
 import matplotlib.pyplot as plt
 
 class EEGAutoencoder(nn.Module):
-    def __init__(self):
+    def __init__(self,encoder_list=0, linear_int=0, in_channels=[35,64], out_channels=[64,128], encoded_space_dim=0, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
         super(EEGAutoencoder, self).__init__()
 
-        in_channels = 35
+        #in_channels = [35,64]
+        #out_channels= [64,128]
         
         # Encoder layers
         self.encoder = nn.Sequential(
-            nn.Conv1d(in_channels, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv1d(in_channels=in_channels[0], out_channels=out_channels[0], kernel_size=kernel, stride=stride, padding=padding),
             nn.ReLU(),
             #nn.Tanh(),
-            nn.MaxPool1d(kernel_size=2, stride=2),
-            nn.Conv1d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.MaxPool1d(kernel_size=kernel_p, stride=stride_p),
+            nn.Conv1d(in_channels=in_channels[1], out_channels=out_channels[1], kernel_size=kernel, stride=stride, padding=padding),
             nn.ReLU(),
-            nn.MaxPool1d(kernel_size=2, stride=2),
+            nn.MaxPool1d(kernel_size=kernel_p, stride=stride_p),
             #nn.Conv1d(128, 128, kernel_size=3, stride=1, padding=1),
             #nn.Tanh(),
             #nn.MaxPool1d(kernel_size=2, stride=2)
@@ -31,10 +32,10 @@ class EEGAutoencoder(nn.Module):
             #nn.Upsample(scale_factor=2),
             #nn.Conv1d(128, 128, kernel_size=3, stride=1, padding=1),
             nn.Upsample(scale_factor=2),
-            nn.Conv1d(128, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv1d(in_channels=out_channels[1], out_channels=in_channels[1], kernel_size=kernel, stride=stride, padding=padding),
             nn.ReLU(),
             nn.Upsample(scale_factor=2),
-            nn.Conv1d(64, in_channels, kernel_size=3, stride=1, padding=1),
+            nn.Conv1d(in_channels=out_channels[0], out_channels=in_channels[0], kernel_size=kernel, stride=stride, padding=padding),
             #nn.Sigmoid()
             #nn.Tanh()
         )
@@ -110,7 +111,7 @@ class Epoch:
             print('\n EPOCH {}/{} \t train loss {} \t val loss {}'.format(epoch + 1, num_epochs,train_loss,val_loss))
             self.diz_loss['train_loss'].append(train_loss)
             self.diz_loss['val_loss'].append(val_loss)
-            #self.plot_ae_outputs()
+        #self.plot_ae_outputs()
         self.plot_losses()
         
     
@@ -274,6 +275,9 @@ def dataload():
 
     return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test
 
+
+#in_channels = [35,64]
+#out_channels= [64,128]
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 autoencoder = EEGAutoencoder()
