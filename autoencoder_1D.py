@@ -7,7 +7,7 @@ import math
 import matplotlib.pyplot as plt
 
 class EEGAutoencoder(nn.Module):
-    def __init__(self,encoder_list=0, linear_int=0, in_channels=[35,64], out_channels=[64,128], encoded_space_dim=0, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
+    def __init__(self,encoder_list=0,decoder_list=0, linear_int=0, in_channels=[35,64], out_channels=[64,128], encoded_space_dim=0, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
         super(EEGAutoencoder, self).__init__()
 
         #in_channels = [35,64]
@@ -31,10 +31,10 @@ class EEGAutoencoder(nn.Module):
         self.decoder = nn.Sequential(
             #nn.Upsample(scale_factor=2),
             #nn.Conv1d(128, 128, kernel_size=3, stride=1, padding=1),
-            nn.Upsample(scale_factor=2),
+            nn.Upsample(size=decoder_list[0], mode='nearest'),
             nn.Conv1d(in_channels=out_channels[1], out_channels=in_channels[1], kernel_size=kernel, stride=stride, padding=padding),
             nn.ReLU(),
-            nn.Upsample(scale_factor=2),
+            nn.Upsample(size=decoder_list[1], mode='nearest'),
             nn.Conv1d(in_channels=out_channels[0], out_channels=in_channels[0], kernel_size=kernel, stride=stride, padding=padding),
             #nn.Sigmoid()
             #nn.Tanh()
@@ -47,7 +47,8 @@ class EEGAutoencoder(nn.Module):
 
 class Epoch:
     
-    def __init__(self, autoencoder, device, dataloader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,n=10):
+    def __init__(self, autoencoder, device, dataloader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,test_dataset, test_labels,n=10):
+    #def __init__(self, autoencoder, device, dataloader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,n=10):
         self.model = autoencoder
         self.device = device
         self.dataloader = dataloader
@@ -58,6 +59,8 @@ class Epoch:
         self.avg_test = avg_test
         self.loss_fn = loss_fn
         self.optimizer = optimizer
+        self.test_dataset = test_dataset
+        self.test_labels = test_labels
         self.n = n
         super().__init__()
 
@@ -111,37 +114,48 @@ class Epoch:
             print('\n EPOCH {}/{} \t train loss {} \t val loss {}'.format(epoch + 1, num_epochs,train_loss,val_loss))
             self.diz_loss['train_loss'].append(train_loss)
             self.diz_loss['val_loss'].append(val_loss)
-        #self.plot_ae_outputs()
+        self.plot_ae_outputs()
         self.plot_losses()
         
     
     def plot_ae_outputs(self):
         plt.figure(figsize=(16,4.5))
         #targets = test_dataset.targets.numpy()
-        targets = test_labels[:,0]
+        targets = self.test_labels[:,0]
+        #print(targets)
         #print(test_dataset.targets)
-        t_idx = {i:np.where(targets==i)[0][0] for i in range(1,self.n)}
+        t_idx = {i:np.where(targets==i)[0] for i in range(1,self.n)}
         #print(t_idx)
         for i in range(1,self.n):
             ax = plt.subplot(2,self.n,i+1)
+            ax.set_ylim(-4, 4)
             #img = test_data[t_idx[i]][0].unsqueeze(0).to(device)
-            img = test_dataset[t_idx[i]][0].unsqueeze(0).to(device)
-            img = img.swapaxes(1,2)
-            self.encoder.eval()
-            self.decoder.eval()
+                
+            val = t_idx[i][0]
+
+            img = self.test_dataset[val][0].unsqueeze(0)
+            #img = img.swapaxes(1,2)
+
+            avg_outputs_test = self.avg_dataset_test[:][0]
+            
+            avg_outputs_test = avg_outputs_test[0,i-1]
+
             with torch.no_grad():
-                rec_img  = self.decoder(self.encoder(img))
+                rec_img  = self.model(img)
             #plt.imshow(img.cpu().squeeze().numpy(), cmap='gist_gray')
-            ax.plot(img.cpu().squeeze().numpy())
+            ax.plot(avg_outputs_test)
             ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(True)  
+            ax.get_yaxis().set_visible(True)
+                
             if i == self.n//2:
-                ax.set_title('Original images')
+                ax.set_title('Average images')
             ax = plt.subplot(2, self.n, i + 1 + self.n)
+            ax.set_ylim(-4, 4)
             #plt.imshow(rec_img.cpu().squeeze().numpy(), cmap='gist_gray') 
-            ax.plot(rec_img.cpu().squeeze().numpy())
+            ax.plot(rec_img.squeeze(0).numpy())
             ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(True)  
+            ax.get_yaxis().set_visible(True) 
+                
             if i == self.n//2:
                 ax.set_title('Reconstructed images')
         plt.show()  
@@ -227,25 +241,28 @@ def average_2(data,labels):
 
     return avg, avg_labels
 
-def calc_convolution(input_size=256, layers=3, filter_size =32, kernel = 4, kernel_p = 2, stride = 2, stride_p = 2, padding = 1, padding_p = 0, pooling = True):
+def calc_convolution(input_size=256,layers=2, filter_size =32, kernel = 4, kernel_p = 2, stride = 2, stride_p = 2, padding = 1, padding_p = 0, pooling = False):
         
         encoder = []
         for i,layer in enumerate(range(layers)):
-            output_size = (input_size+2*padding - kernel)//stride + 1
-            #output_size = ((input_size+2*(padding-1)*(kernel-1))-1//stride) + 1
+            output_size = round((input_size+2*padding - kernel)/stride + 1)
             encoder.append(output_size)
+            print(output_size)
             if pooling:
                 if i+1 < layers:
-                    output_size = (output_size+2*padding_p - kernel_p)//stride_p + 1
-                    #output_size = ((output_size+2*(padding_p-1)*(kernel_p-1))-1//stride_p) + 1
+                    output_size = round((output_size+2*padding_p - kernel_p)/stride_p + 1)
                     encoder.append(output_size)
-                
-            
+                    print(output_size)
             input_size = output_size
         
         decoder = encoder.copy()
         decoder.reverse()
         
+        for i in range(1,len(decoder)-1,2):
+            decoder.pop(i)
+            encoder.pop(i)
+
+
         linear = encoder[-1] * filter_size
         
         return encoder, decoder, linear
@@ -295,21 +312,24 @@ def dataload():
     valid_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size,shuffle=True)
 
-    return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test
+    return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels
+    #return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test
 
 if __name__ == "__main__":
     in_channels = [35,64]
     out_channels= [64,128]
 
+    encoder_list, decoder_list, _ = calc_convolution(layers=2, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2, padding = 1, padding_p = 0, pooling = True)
+
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    autoencoder = EEGAutoencoder()
+    autoencoder = EEGAutoencoder(decoder_list = decoder_list)
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
-    train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test = dataload()
+
+    train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload()
     dataloader = train_loader
     num_epochs = 2
 
-    model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, n=10)
-        
+    model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=5)   
     #model.to(device)
     model2 = model.train(num_epochs=num_epochs) #dataloader, loss_fn, optimizer,n=10))
