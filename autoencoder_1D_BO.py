@@ -11,9 +11,8 @@ from torch.utils.data import DataLoader,random_split, Dataset
 from torch import nn
 import torch.nn.functional as F
 import torch.optim as optim
-import math
 import GPyOpt
-#from CNN import Epoch, Encoder, Decoder, dataload, calc_convolution
+
 
 encoded_space_dim = tuple([0,0])
 layers = tuple([3,3])
@@ -23,7 +22,10 @@ stride = tuple([1,1])
 stride_p = tuple([2,2]) 
 padding = tuple([1,1])
 padding_p = tuple([0,0]) 
-
+learning_rate = tuple(np.arange(1,10,1)*1e-5)
+weight_decay = tuple(np.arange(1,10,1)*1e-1)
+criterion = tuple(np.arange(1,3,1))
+optimizer = tuple(np.arange(1,3,1))
 
 #encoded_space_dim = tuple([35,35])                      #Ranges
 #layers = tuple([3,3]) 
@@ -34,14 +36,18 @@ padding_p = tuple([0,0])
 #padding = tuple([0,1,2]) 
 #padding_p = tuple([0,0]) 
 
-domain = [{'name': 'encoded_space_dim', 'type': 'discrete', 'domain': encoded_space_dim},
-          {'name': 'layers', 'type': 'discrete', 'domain': layers},
-          {'name': 'kernel', 'type': 'discrete', 'domain': kernel},
-          {'name': 'kernel_p', 'type': 'discrete', 'domain': kernel_p},
-          {'name': 'stride', 'type': 'discrete', 'domain': stride},
-          {'name': 'stride_p', 'type': 'discrete', 'domain': stride_p},
-          {'name': 'padding', 'type': 'discrete', 'domain': padding},
-          {'name': 'padding_p', 'type': 'discrete', 'domain': padding_p}
+domain = [{'name': 'encoded_space_dim', 'type': 'discrete', 'domain': encoded_space_dim},       #0
+          {'name': 'layers', 'type': 'discrete', 'domain': layers},                             #1
+          {'name': 'kernel', 'type': 'discrete', 'domain': kernel},                             #2
+          {'name': 'kernel_p', 'type': 'discrete', 'domain': kernel_p},                         #3
+          {'name': 'stride', 'type': 'discrete', 'domain': stride},                             #4
+          {'name': 'stride_p', 'type': 'discrete', 'domain': stride_p},                         #5
+          {'name': 'padding', 'type': 'discrete', 'domain': padding},                           #6
+          {'name': 'padding_p', 'type': 'discrete', 'domain': padding_p},                       #7
+          {'name': 'learning_rate', 'type': 'discrete', 'domain': learning_rate},               #8
+          {'name': 'weight_decay', 'type': 'discrete', 'domain': weight_decay},                 #9
+          {'name': 'criterion', 'type': 'discrete', 'domain': criterion},                       #10
+          {'name': 'optimizer', 'type': 'discrete', 'domain': optimizer}                        #11
          ]
 
 train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test = dataload()
@@ -57,8 +63,8 @@ def objective_function(x):
 
     #print(param)
     #print(int(param[0]),param[1])
-    #if param[11] == True:
-        #pooling = True
+    if param[10] == 1 or 2 or 3:
+        criterion = nn.L1Loss()
     #else:
         #pooling = False
     # we have to handle the categorical variables
@@ -94,9 +100,9 @@ def objective_function(x):
     {'params': autoencoder.parameters()},
     ]
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    autoencoder = EEGAutoencoder()
+    #autoencoder = EEGAutoencoder()                                  #We've merely set these to 
     criterion = nn.L1Loss()
-    optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(autoencoder.parameters(), lr=param[8],weight_decay=param[9])
 
     #autoencoder.to(device)
    
@@ -124,5 +130,9 @@ opt.run_optimization(max_iter = 2)
 
 x_best = opt.X[np.argmin(opt.Y)]
 print(x_best)
-#print("The best parameters obtained: batch_size=" + str(x_best[0]) + ", learning_rate=" + str(x_best[1]))
+domain[0]["name"]
+      
+print("The best parameters obtained:" + domain[0]["name"] + "=" + str(x_best[0]) + "," + domain[1]["name"] + "=" + str(x_best[1]) + "," + domain[2]["name"] + "=" + str(x_best[2]) + "," + domain[3]["name"] + "=" + str(x_best[3]) + "," + domain[4]["name"] + "=" + str(x_best[4]) + "," + domain[5]["name"] + "=" + str(x_best[5]) + "," + domain[6]["name"] + "=" + str(x_best[6]) + "," + domain[7]["name"] + "=" + str(x_best[7]) + "," + domain[8]["name"] + "=" + str(x_best[8]) + "," + domain[9]["name"] + "=" + str(x_best[9]) + "," + domain[10]["name"] + "=" + str(x_best[10]) + "," + domain[11]["name"] + "=" + str(x_best[11]))
+
+
 #return x_best, architecture, hyperparameters
