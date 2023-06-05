@@ -1,7 +1,9 @@
+
 '''Simple helper class to deal with a CNN network's calculations of the individual layers' in- and output-sizes, 
 creating a list with the expected sizes of the CNN architecture with a set of given inputs. These inputs are:
 number of layers, filter size, kernel size, "kernel_p"-size, stride of kernel, stride of "kernel_p", padding of kernel
 , padding of "kernel_p", and if pooling should be True or False. the "_p" is for pooling layers only.'''
+
 class Network_cal():
     def __init__(self, input_size = 256):
         
@@ -25,9 +27,14 @@ class Network_cal():
         decoder = encoder.copy()
         decoder.reverse()
         
-        linar = encoder[-1] * filter_size
+        for i in range(1,len(decoder)-1,2):
+            decoder.pop(i)
+            encoder.pop(i)
+
+
+        linear = encoder[-1] * filter_size
         
-        return encoder, decoder, linar
+        return encoder, decoder, linear
 
         
         
@@ -36,6 +43,7 @@ class Network_cal():
         
      #   return output_size
         
-    
-Nc = Network_cal()
-print(Nc.Calc_convolution(layers=3, kernel = 4, kernel_p = 2, stride = 1, stride_p = 2, padding = 1, padding_p = 0, pooling = True))
+if __name__ == "__main__":   
+    Nc = Network_cal()
+    print(Nc.Calc_convolution(layers=2, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2, padding = 1, padding_p = 0, pooling = True))
+
