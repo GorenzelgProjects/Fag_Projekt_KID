@@ -227,6 +227,28 @@ def average_2(data,labels):
 
     return avg, avg_labels
 
+def calc_convolution(input_size=256, layers=3, filter_size =32, kernel = 4, kernel_p = 2, stride = 2, stride_p = 2, padding = 1, padding_p = 0, pooling = True):
+        
+        encoder = []
+        for i,layer in enumerate(range(layers)):
+            output_size = (input_size+2*padding - kernel)//stride + 1
+            #output_size = ((input_size+2*(padding-1)*(kernel-1))-1//stride) + 1
+            encoder.append(output_size)
+            if pooling:
+                if i+1 < layers:
+                    output_size = (output_size+2*padding_p - kernel_p)//stride_p + 1
+                    #output_size = ((output_size+2*(padding_p-1)*(kernel_p-1))-1//stride_p) + 1
+                    encoder.append(output_size)
+                
+            
+            input_size = output_size
+        
+        decoder = encoder.copy()
+        decoder.reverse()
+        
+        linear = encoder[-1] * filter_size
+        
+        return encoder, decoder, linear
 
 def dataload():
     train_data = np.load("train_data_1_30.npy")
@@ -275,19 +297,19 @@ def dataload():
 
     return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test
 
+if __name__ == "__main__":
+    in_channels = [35,64]
+    out_channels= [64,128]
 
-#in_channels = [35,64]
-#out_channels= [64,128]
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    autoencoder = EEGAutoencoder()
+    criterion = nn.L1Loss()
+    optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
+    train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test = dataload()
+    dataloader = train_loader
+    num_epochs = 2
 
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-autoencoder = EEGAutoencoder()
-criterion = nn.L1Loss()
-optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
-train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test = dataload()
-dataloader = train_loader
-num_epochs = 10
-
-model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, n=10)
-    
-#model.to(device)
-model2 = model.train(num_epochs=num_epochs) #dataloader, loss_fn, optimizer,n=10))
+    model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, n=10)
+        
+    #model.to(device)
+    model2 = model.train(num_epochs=num_epochs) #dataloader, loss_fn, optimizer,n=10))
