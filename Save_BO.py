@@ -71,8 +71,8 @@ class SaveData:
         print(f"plot saved to {file_path}.png")
         return ##This is under revision as of what is smartest
         
-
+if __name__ == "__main__":
 # Example usage:
-save = SaveData()
-my_data = ["apple", "banana", "cherry", "date"]
-save.save_data_to_txt(my_data, folder_name="fruits", relative_path="./data_files")
+    save = SaveData()
+    my_data = ["apple", "banana", "cherry", "date"]
+    save.save_data_to_txt(my_data, folder_name="fruits", relative_path="./data_files")
