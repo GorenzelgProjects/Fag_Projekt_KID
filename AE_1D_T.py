@@ -7,7 +7,7 @@ import math
 import matplotlib.pyplot as plt
 
 class AET(nn.Module):
-    def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], encoded_space_dim=0, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
+    def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], nhead = 8, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
         super(AET, self).__init__()
 
         #in_channels = [35,64]
@@ -28,9 +28,9 @@ class AET(nn.Module):
         )
         
         self.transformer = nn.Sequential(
-            nn.TransformerEncoderLayer(d_model = transformer_in, nhead = 8, dim_feedforward = out_channels[1]),
-            nn.TransformerEncoderLayer(d_model = transformer_in, nhead = 8, dim_feedforward = out_channels[1]),
-            nn.TransformerEncoderLayer(d_model = transformer_in, nhead = 8, dim_feedforward = out_channels[1])
+            nn.TransformerEncoderLayer(d_model = transformer_in, nhead =nhead, dim_feedforward = out_channels[1]),
+            nn.TransformerEncoderLayer(d_model = transformer_in, nhead = nhead, dim_feedforward = out_channels[1]),
+            nn.TransformerEncoderLayer(d_model = transformer_in, nhead = nhead, dim_feedforward = out_channels[1])
             )
         
         # Decoder layers
