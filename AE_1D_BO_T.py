@@ -101,7 +101,7 @@ def objective_function(x):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     #autoencoder = EEGAutoencoder()                                  #We've merely set these to 
     criterion = criterion
-    optimizer = torch.optim.Adam(autoencoder.parameters(), lr=param[8],weight_decay=param[9])
+    optimizer = torch.optim.Adam(autoencoder.parameters(), lr=param[2],weight_decay=param[3])
 
     #autoencoder.to(device)
    
