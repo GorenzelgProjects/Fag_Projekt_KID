@@ -24,7 +24,7 @@ padding = 1
 padding_p = 0 
 
 
-encoded_space_dim = tuple([32,32])
+nhead = tuple([4,8,16,32])
 #kernel = tuple([3,4,5,6])
 learning_rate = tuple(np.arange(1,10,1)*1e-5)
 weight_decay = tuple(np.arange(1,10,1)*1e-1)
@@ -40,7 +40,7 @@ optimizer = tuple(np.arange(1,3,1))
 #padding = tuple([0,1,2]) 
 #padding_p = tuple([0,0]) 
 
-domain = [{'name': 'encoded_space_dim', 'type': 'discrete', 'domain': encoded_space_dim},       #0                           #1
+domain = [{'name': 'nhead', 'type': 'discrete', 'domain': nhead},       #0                           #1
           {'name': 'kernel', 'type': 'discrete', 'domain': kernel},                             #1         
           {'name': 'learning_rate', 'type': 'discrete', 'domain': learning_rate},               #2
           {'name': 'weight_decay', 'type': 'discrete', 'domain': weight_decay},                 #3
@@ -86,7 +86,7 @@ def objective_function(x):
                 transformer_in=transformer_in,
                 in_channels = in_channels, 
                 out_channels = out_channels, 
-                encoded_space_dim = int(param[0]), 
+                nhead = int(param[0]), 
                 layers=int(layers), 
                 kernel = int(kernel), 
                 kernel_p = int(kernel_p), 
