@@ -194,18 +194,29 @@ class Epoch:
         img = self.test_dataset[val][0].unsqueeze(0)
 
         avg_outputs_test = self.avg_dataset_test[:][0]
-            
-        avg_outputs_test = avg_outputs_test[0,0]
+        avg_outputs_norm = avg_outputs_test[:,0]
+        
 
+        for i in range(len(avg_outputs_norm[0])):
+            avg_outputs_norm[0,i] = avg_outputs_norm[0,i] / np.linalg.norm(avg_outputs_norm[0,i],ord=1)
+
+        avg_outputs_test = avg_outputs_norm[0]
+        print(avg_outputs_test)
         with torch.no_grad():
             rec_img  = self.model(img.to(self.device))
-
+        count =0
         rec = rec_img.cpu().squeeze().numpy()
+        #print(rec.size())
+        for i in range(len(rec)):
+            rec[i] = rec[i] / np.linalg.norm(rec[i],ord=1)
+            count += 1
+        print(count)
+        print(rec)
 
 
         x = np.arange(0,256)
         for i in range(35):
-            displacement = i*4
+            displacement = i*0.05
 
             plt.plot(x,avg_outputs_test[i,:]+displacement, color='black')
             plt.plot(x,rec[i,:]+displacement, color='tomato', alpha=0.7)
