@@ -1,4 +1,5 @@
-from autoencoder_1D import Epoch, EEGAutoencoder, EEGDataset,EEGDataset2, dataload, calc_convolution
+#from autoencoder_1D import Epoch, EEGAutoencoder, EEGDataset,EEGDataset2, dataload, calc_convolution
+from AE_1D_T import Epoch, AET, EEGDataset,EEGDataset2, dataload, calc_convolution
 #from Save_BO import SaveData
 import matplotlib.pyplot as plt # plotting library
 import numpy as np # this module is useful to work with numerical arrays
@@ -13,6 +14,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import GPyOpt
 
+
 kernel = 3
 layers = 2
 kernel_p = 2
@@ -22,7 +24,7 @@ padding = 1
 padding_p = 0 
 
 
-encoded_space_dim = tuple([32,32])
+nhead = tuple([4,8,16,32])
 #kernel = tuple([3,4,5,6])
 learning_rate = tuple(np.arange(1,10,1)*1e-5)
 weight_decay = tuple(np.arange(1,10,1)*1e-1)
@@ -38,7 +40,7 @@ optimizer = tuple(np.arange(1,3,1))
 #padding = tuple([0,1,2]) 
 #padding_p = tuple([0,0]) 
 
-domain = [{'name': 'encoded_space_dim', 'type': 'discrete', 'domain': encoded_space_dim},       #0                           #1
+domain = [{'name': 'nhead', 'type': 'discrete', 'domain': nhead},       #0                           #1
           {'name': 'kernel', 'type': 'discrete', 'domain': kernel},                             #1         
           {'name': 'learning_rate', 'type': 'discrete', 'domain': learning_rate},               #2
           {'name': 'weight_decay', 'type': 'discrete', 'domain': weight_decay},                 #3
@@ -53,7 +55,7 @@ def objective_function(x):
     param = x[0]
     in_channels = [35,64]
     out_channels= [64,128]
-    encoder_list, decoder_list, _ = calc_convolution(filter_size=int(param[0]),
+    encoder_list, decoder_list, transformer_in = calc_convolution(filter_size=int(param[0]),
                                                      layers=int(layers), 
                                                      kernel = int(kernel), 
                                                      kernel_p = int(kernel_p), 
@@ -66,7 +68,7 @@ def objective_function(x):
     # we have to handle the categorical variables that is convert 0/1 to labels
     # log2/sqrt and gini/entropy
     
-    
+
     #print(param)
     #print(int(param[0]),param[1])
     if param[4] == 1:
@@ -78,31 +80,13 @@ def objective_function(x):
     elif param[4] == 4:
         criterion = nn.CrossEntropyLoss()
     
-    
-    #else:
-        #pooling = False
-    # we have to handle the categorical variables
-    #if param[2] == 0:
-    #    max_f = 'log2'
-    #elif param[2] == 1:
-    # max_f = 'sqrt'
-    #else:
-    #  max_f = None
 
-    #if param[3] == 0:
-    #  crit = 'gini'
-    #else:
-    #crit = 'entropy'
-
-    #create the model
-    #in_channels_e = [int(param[0])]
-
-    autoencoder = EEGAutoencoder(encoder_list=0,
+    autoencoder = AET(encoder_list=0,
                 decoder_list=decoder_list, 
-                linear_int=0,
+                transformer_in=transformer_in,
                 in_channels = in_channels, 
                 out_channels = out_channels, 
-                encoded_space_dim = int(param[0]), 
+                nhead = int(param[0]), 
                 layers=int(layers), 
                 kernel = int(kernel), 
                 kernel_p = int(kernel_p), 
@@ -110,20 +94,20 @@ def objective_function(x):
                 padding = int(padding), 
                 padding_p = int(padding_p), 
                 pooling = True)
-    
+
     params_to_optimize = [
     {'params': autoencoder.parameters()},
     ]
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-
+    #autoencoder = EEGAutoencoder()                                  #We've merely set these to 
     criterion = criterion
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=param[2],weight_decay=param[3])
 
     #autoencoder.to(device)
    
-    num_epochs = 10
+    num_epochs = 2
 
-    model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=16)
+    model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=5)
         
     #model.to(device)
     model.train(num_epochs=num_epochs) #dataloader, loss_fn, optimizer,n=10))

@@ -34,9 +34,9 @@ class AET(nn.Module):
         self.transformer_encoder = nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1])
         
         self.transformer = nn.Sequential(
-            nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1]),
-            nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1]),
-            nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1])
+            nn.TransformerEncoderLayer(d_model = transformer_in, nhead =nhead, dim_feedforward = out_channels[1]),
+            nn.TransformerEncoderLayer(d_model = transformer_in, nhead = nhead, dim_feedforward = out_channels[1]),
+            nn.TransformerEncoderLayer(d_model = transformer_in, nhead = nhead, dim_feedforward = out_channels[1])
             )
         
         # Decoder layers
