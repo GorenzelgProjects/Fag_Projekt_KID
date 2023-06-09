@@ -7,7 +7,7 @@ import math
 import matplotlib.pyplot as plt
 
 class AET(nn.Module):
-    def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], encoded_space_dim=0, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
+    def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], nhead=8, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
         super(AET, self).__init__()
 
         #in_channels = [35,64]
@@ -15,35 +15,46 @@ class AET(nn.Module):
         
         # Encoder layers
         self.encoder = nn.Sequential(
+            #nn.Dropout(p=0.2),
             nn.Conv1d(in_channels=in_channels[0], out_channels=out_channels[0], kernel_size=kernel, stride=stride, padding=padding),
-            nn.ReLU(),
-            #nn.Tanh(),
+            #nn.ReLU(),
+            nn.Tanh(),
             nn.MaxPool1d(kernel_size=kernel_p, stride=stride_p),
+            #nn.AvgPool1d(kernel_size=kernel_p, stride=stride_p),
             nn.Conv1d(in_channels=in_channels[1], out_channels=out_channels[1], kernel_size=kernel, stride=stride, padding=padding),
-            nn.ReLU(),
+            #nn.ReLU(),
+            nn.Tanh(),
             nn.MaxPool1d(kernel_size=kernel_p, stride=stride_p),
-            #nn.Conv1d(128, 128, kernel_size=3, stride=1, padding=1),
+            #nn.AvgPool1d(kernel_size=kernel_p, stride=stride_p),
+            #nn.Conv1d(in_channels=in_channels[2], out_channels=out_channels[2], kernel_size=kernel, stride=stride, padding=padding),
+            #nn.ReLU(),
             #nn.Tanh(),
-            #nn.MaxPool1d(kernel_size=2, stride=2)
         )
+
+        self.transformer_encoder = nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1])
         
         self.transformer = nn.Sequential(
-            nn.TransformerEncoderLayer(d_model = transformer_in, nhead = 8, dim_feedforward = out_channels[1]),
-            nn.TransformerEncoderLayer(d_model = transformer_in, nhead = 8, dim_feedforward = out_channels[1]),
-            nn.TransformerEncoderLayer(d_model = transformer_in, nhead = 8, dim_feedforward = out_channels[1])
+            nn.TransformerEncoder(self.transformer_encoder, num_layers=3)
             )
         
         # Decoder layers
         self.decoder = nn.Sequential(
-            #nn.Upsample(scale_factor=2),
-            #nn.Conv1d(128, 128, kernel_size=3, stride=1, padding=1),
+            #nn.Upsample(size=decoder_list[0], mode='nearest'),
+            #nn.ReLU(),
+            #nn.Tanh(),
+            #nn.Conv1d(in_channels=out_channels[2], out_channels=in_channels[2], kernel_size=kernel, stride=stride, padding=padding),
+
+            
             nn.Upsample(size=decoder_list[0], mode='nearest'),
+            #nn.ReLU(),
+            nn.Tanh(),
             nn.Conv1d(in_channels=out_channels[1], out_channels=in_channels[1], kernel_size=kernel, stride=stride, padding=padding),
-            nn.ReLU(),
+            
+            
             nn.Upsample(size=decoder_list[1], mode='nearest'),
-            nn.Conv1d(in_channels=out_channels[0], out_channels=in_channels[0], kernel_size=kernel, stride=stride, padding=padding),
-            #nn.Sigmoid()
-            #nn.Tanh()
+            #nn.ReLU(),
+            nn.Tanh(),
+            nn.Conv1d(in_channels=out_channels[0], out_channels=in_channels[0], kernel_size=kernel, stride=stride, padding=padding)
         )
 
     def forward(self, x):
@@ -78,6 +89,8 @@ class Epoch:
 
         for data in self.dataloader:
             inputs, label = data  # Assuming your dataloader provides (input, label) pairs
+            #inputs = inputs.swapaxes(0,1)
+            inputs = inputs.to(self.device)
             avg_outputs = self.avg_dataset[:][0]       
             avg_outputs = avg_outputs[label[:,1]-1,label[:,0]-1].to(self.device)
             self.optimizer.zero_grad()
@@ -98,6 +111,8 @@ class Epoch:
 
             for test_data in self.test_loader:
                 inputs, label = test_data  # Assuming your dataloader provides (input, label) pairs
+                #inputs = inputs.swapaxes(0,1)
+                inputs = inputs.to(self.device)
                 avg_outputs_test = self.avg_dataset_test[:][0]
         
                 avg_outputs_test = avg_outputs_test[label[:,1]-1-30,label[:,0]-1].to(self.device)
@@ -121,7 +136,8 @@ class Epoch:
             print('\n EPOCH {}/{} \t train loss {} \t val loss {}'.format(epoch + 1, num_epochs,train_loss,val_loss))
             self.diz_loss['train_loss'].append(train_loss)
             self.diz_loss['val_loss'].append(val_loss)
-        self.plot_ae_outputs()
+        #self.plot_ae_outputs()
+        self.plot_channels()
         self.plot_losses()
         
     
@@ -148,7 +164,7 @@ class Epoch:
             avg_outputs_test = avg_outputs_test[0,i-1]
 
             with torch.no_grad():
-                rec_img  = self.model(img)
+                rec_img  = self.model(img.to(self.device))
             #plt.imshow(img.cpu().squeeze().numpy(), cmap='gist_gray')
             ax.plot(avg_outputs_test)
             ax.get_xaxis().set_visible(False)
@@ -159,13 +175,48 @@ class Epoch:
             ax = plt.subplot(2, self.n, i + 1 + self.n)
             ax.set_ylim(-4, 4)
             #plt.imshow(rec_img.cpu().squeeze().numpy(), cmap='gist_gray') 
-            ax.plot(rec_img.squeeze(0).numpy())
+            #ax.plot(rec_img.squeeze(0).numpy())
+            ax.plot(rec_img.cpu().squeeze().numpy())
             ax.get_xaxis().set_visible(False)
             ax.get_yaxis().set_visible(True) 
                 
             if i == self.n//2:
                 ax.set_title('Reconstructed images')
-        plt.show()  
+        plt.show()
+        
+    def plot_channels(self):
+        label_pos = []
+        label_name = []
+
+        targets = self.test_labels[:,0]
+        t_idx = {1:np.where(targets==1)[0]}
+        val = t_idx[1][0]
+        img = self.test_dataset[val][0].unsqueeze(0)
+
+        avg_outputs_test = self.avg_dataset_test[:][0]
+            
+        avg_outputs_test = avg_outputs_test[0,0]
+
+        with torch.no_grad():
+            rec_img  = self.model(img.to(self.device))
+
+        rec = rec_img.cpu().squeeze().numpy()
+
+
+        x = np.arange(0,256)
+        for i in range(35):
+            displacement = i*4
+
+            plt.plot(x,avg_outputs_test[i,:]+displacement, color='black')
+            plt.plot(x,rec[i,:]+displacement, color='tomato', alpha=0.7)
+            label_pos.append(avg_outputs_test[i,:].mean()+displacement)
+            temp_name = "EEG " + str(i+1)
+            label_name.append(temp_name)
+
+        plt.yticks(label_pos, label_name)
+        plt.xlim([0, 256])
+        #plt.yticks(y, labels, rotation='vertical')
+        plt.show()
 
     def plot_losses(self):
         # Plot losses
@@ -185,7 +236,7 @@ class EEGDataset(Dataset):
         #test_transform = transforms.Compose([
         #transforms.ToTensor(),
         #])
-        
+        #self.data = torch.tensor(data, dtype=torch.float32).unsqueeze(1)
         self.data = torch.tensor(data, dtype=torch.float32).squeeze(1)
         #self.data = torch.tensor(data, dtype=torch.float32).unsqueeze(1)
         self.labels = torch.tensor(labels, dtype=torch.long)
@@ -336,17 +387,23 @@ if __name__ == "__main__":
     padding = 1
     padding_p = 0
     pooling = True
+    nhead = 8
+    num_epochs = 3
     
     encoder_list, decoder_list, transformer_in = calc_convolution(layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p, padding = padding, padding_p = padding_p, pooling = pooling) #Stride can't be change do to BO
     print(encoder_list, decoder_list)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, encoded_space_dim=0, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
-    criterion = nn.L1Loss()
+    autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
+    autoencoder.to(device)
+    #criterion = nn.L1Loss()
+    criterion = nn.MSELoss()
+    #criterion = nn.BCELoss()
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
+    #optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
 
     train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload()
     dataloader = train_loader
-    num_epochs = 2
+    
 
     model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=5)   
     #model.to(device)
