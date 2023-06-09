@@ -120,7 +120,7 @@ def objective_function(x):
    
     num_epochs = 2
 
-    model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=5)
+    model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=16)
         
     #model.to(device)
     model.train(num_epochs=num_epochs) #dataloader, loss_fn, optimizer,n=10))
