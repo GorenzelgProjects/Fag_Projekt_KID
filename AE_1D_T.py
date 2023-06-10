@@ -365,16 +365,11 @@ def calc_convolution(input_size=256,layers=2, filter_size =32, kernel = 4, kerne
         
         return encoder, decoder, transformer_in
 
-def dataload():
+def dataload(batch_size = 32, n = 12, transfer = 64):
     train_data = np.load("train_data_1_30.npy")
     train_labels = np.load("train_label_1_30.npy").astype(np.int32)
     test_data = np.load("test_data_31_40.npy")
     test_labels = np.load("test_label_31_40.npy").astype(np.int32)
-
-    batch_size=32
-    n = 12                   # Number of labels
-    transfer = 64    # Number of test trials that needs to be transfer 
-    #train_data = np.transpose(train_data, (1,2,0))
 
     train_data = train_data*1e5
     test_data = test_data*1e5
@@ -444,6 +439,11 @@ if __name__ == "__main__":
     pooling = True
     nhead = 8
     num_epochs = 10
+
+    batch_size=32
+    n = 12                   # Number of labels
+    transfer = 64    # Number of test trials that needs to be transfer 
+
     
     encoder_list, decoder_list, transformer_in = calc_convolution(layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p, padding = padding, padding_p = padding_p, pooling = pooling) #Stride can't be change do to BO
     print(encoder_list, decoder_list)
@@ -456,9 +456,9 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
     #optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
 
-    train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload()
+    train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload(batch_size=batch_size, n=n, transfer=transfer)
     dataloader = train_loader
     
 
-    model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=12)   
+    model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=n)   
     model2 = model.train(num_epochs=num_epochs) #dataloader, loss_fn, optimizer,n=10))
