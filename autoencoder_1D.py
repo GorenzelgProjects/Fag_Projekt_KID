@@ -48,7 +48,6 @@ class EEGAutoencoder(nn.Module):
 class Epoch:
     
     def __init__(self, autoencoder, device, dataloader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,test_dataset, test_labels,n=10):
-    #def __init__(self, autoencoder, device, dataloader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,n=10):
         self.model = autoencoder
         self.device = device
         self.dataloader = dataloader
@@ -245,11 +244,11 @@ def calc_convolution(input_size=256,layers=2, filter_size =32, kernel = 4, kerne
         
         encoder = []
         for i,layer in enumerate(range(layers)):
-            output_size = round((input_size+2*padding - kernel)/stride + 1)
+            output_size = (input_size+2*padding - kernel)//stride + 1
             encoder.append(output_size)
             if pooling:
                 if i+1 < layers:
-                    output_size = round((output_size+2*padding_p - kernel_p)/stride_p + 1)
+                    output_size = (output_size+2*padding_p - kernel_p)//stride_p + 1
                     encoder.append(output_size)
             input_size = output_size
         
@@ -262,7 +261,7 @@ def calc_convolution(input_size=256,layers=2, filter_size =32, kernel = 4, kerne
             decoder.pop(i)
             encoder.pop(i)
 
-        decoder[-1] -= last_output - 256
+        decoder[-1] = 256 - (last_output - 256)
         linear = encoder[-1] * filter_size
         
         return encoder, decoder, linear
@@ -319,7 +318,7 @@ if __name__ == "__main__":
     in_channels = [35,64]
     out_channels= [64,128]
 
-    encoder_list, decoder_list, _ = calc_convolution(layers=2, kernel = 6, kernel_p = 2, stride = 2, stride_p = 2, padding = 1, padding_p = 0, pooling = True)
+    encoder_list, decoder_list, _ = calc_convolution(layers=2, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2, padding = 1, padding_p = 0, pooling = True)
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     autoencoder = EEGAutoencoder(decoder_list = decoder_list)
@@ -328,7 +327,7 @@ if __name__ == "__main__":
 
     train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload()
     dataloader = train_loader
-    num_epochs = 2
+    num_epochs = 10
 
     model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=5)   
     #model.to(device)
