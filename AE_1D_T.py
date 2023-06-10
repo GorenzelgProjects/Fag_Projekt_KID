@@ -442,7 +442,7 @@ if __name__ == "__main__":
 
     batch_size=32
     n = 12                   # Number of labels
-    transfer = 64    # Number of test trials that needs to be transfer 
+    transfer = 0    # Number of test trials that needs to be transfer 
 
     
     encoder_list, decoder_list, transformer_in = calc_convolution(layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p, padding = padding, padding_p = padding_p, pooling = pooling) #Stride can't be change do to BO
