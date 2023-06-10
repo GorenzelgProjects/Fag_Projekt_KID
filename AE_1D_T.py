@@ -5,6 +5,8 @@ import numpy as np
 from torchvision import transforms
 import math
 import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
 
 class AET(nn.Module):
     def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], nhead=8, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
@@ -15,7 +17,7 @@ class AET(nn.Module):
         
         # Encoder layers
         self.encoder = nn.Sequential(
-            #nn.Dropout(p=0.2),
+            nn.Dropout(p=0.2),
             nn.Conv1d(in_channels=in_channels[0], out_channels=out_channels[0], kernel_size=kernel, stride=stride, padding=padding),
             #nn.ReLU(),
             nn.Tanh(),
@@ -31,7 +33,7 @@ class AET(nn.Module):
             #nn.Tanh(),
         )
 
-        self.transformer_encoder = nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1])
+        self.transformer_encoder = nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1], dropout=0.2)
         
         self.transformer = nn.Sequential(
             nn.TransformerEncoder(self.transformer_encoder, num_layers=3)
@@ -65,11 +67,12 @@ class AET(nn.Module):
 
 class Epoch:
     
-    def __init__(self, autoencoder, device, dataloader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,test_dataset, test_labels,n=10):
-    #def __init__(self, autoencoder, device, dataloader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,n=10):
+    def __init__(self, autoencoder, device, dataloader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,test_dataset, test_labels,n=10):
+    #def __init__(self, autoencoder, device, dataloader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,n=10):
         self.model = autoencoder
         self.device = device
         self.dataloader = dataloader
+        self.val_loader = valid_loader
         self.test_loader = test_loader
         self.avg_dataset = avg_dataset
         self.avg_dataset_test = avg_dataset_test
@@ -86,7 +89,7 @@ class Epoch:
     def train_epoch(self,verbose=False):
         # Set train mode for both the encoder and the decoder
         train_loss = []
-
+        val_loss = []
         for data in self.dataloader:
             inputs, label = data  # Assuming your dataloader provides (input, label) pairs
             #inputs = inputs.swapaxes(0,1)
@@ -191,22 +194,33 @@ class Epoch:
         targets = self.test_labels[:,0]
         t_idx = {1:np.where(targets==1)[0]}
         val = t_idx[1][0]
+        original = self.test_dataset[val][0].numpy()
         img = self.test_dataset[val][0].unsqueeze(0)
 
         avg_outputs_test = self.avg_dataset_test[:][0]
-            
-        avg_outputs_test = avg_outputs_test[0,0]
+        avg_outputs_norm = avg_outputs_test[0,0].numpy()
+        minimum = avg_outputs_norm.min(axis=1)
+        maximum = avg_outputs_norm.max(axis=1)
+
+        avg_outputs_test = avg_outputs_test[0,0].numpy()
 
         with torch.no_grad():
             rec_img  = self.model(img.to(self.device))
 
         rec = rec_img.cpu().squeeze().numpy()
 
+        for i in range(35):
+            c = rec[i,:]
+            v = avg_outputs_test[i,:]
+            o = original[i,:]
+            rec[i,:] = (c - minimum[i]) / (maximum[i] - minimum[i])
+            avg_outputs_test[i,:] = (v - minimum[i]) / (maximum[i] - minimum[i])
+            original[i,:] = (o - minimum[i]) / (maximum[i] - minimum[i])
 
         x = np.arange(0,256)
         for i in range(35):
-            displacement = i*4
-
+            displacement = i*2
+            plt.plot(x,original[i,:]+displacement, color='grey', alpha=0.5)
             plt.plot(x,avg_outputs_test[i,:]+displacement, color='black')
             plt.plot(x,rec[i,:]+displacement, color='tomato', alpha=0.7)
             label_pos.append(avg_outputs_test[i,:].mean()+displacement)
@@ -263,10 +277,10 @@ class EEGDataset2(Dataset):
     def __getitem__(self, idx):
         return self.data[idx], self.labels[idx]
 
-def average(data,labels):
-    avg = np.zeros((30,4,35,256))
+def average(data,labels,n):
+    avg = np.zeros((30,n,35,256))
     avg_labels = np.zeros((30,2))
-    for i in range(1,5):
+    for i in range(1,n+1):
         bins = labels[np.where(labels[:,0] == i)]
         bins_data = data[np.where(labels[:,0] == i)]
         for j in range(1,31):
@@ -281,10 +295,10 @@ def average(data,labels):
 
     return avg, avg_labels
 
-def average_2(data,labels):
-    avg = np.zeros((10,4,35,256))
+def average_2(data,labels,n):
+    avg = np.zeros((10,n,35,256))
     avg_labels = np.zeros((10,2))
-    for i in range(1,5):
+    for i in range(1,n+1):
         bins = labels[np.where(labels[:,0] == i)]
         bins_data = data[np.where(labels[:,0] == i)]
         for j in range(1,11):
@@ -298,6 +312,30 @@ def average_2(data,labels):
             avg[j-1,i-1,:,:] = mean
 
     return avg, avg_labels
+
+def test_transfer(data,labels,n,transfer=0, target_bin=1, target_sub=31):
+    first_draw = True
+    avg = np.zeros((1,n,35,256))
+    avg_labels = np.zeros((1,2))
+    #for i in range(1,n+1):
+    for i in range(1,n+1):
+        bins = labels[np.where(labels[:,0] == i)]
+        bins_data = data[np.where(labels[:,0] == i)]
+        subs = bins[np.where(bins[:,1] == target_sub)]
+        subs_data = bins_data[np.where(bins[:,1] == target_sub)]
+        avg_labels[0,0] = i
+        avg_labels[0,1] = target_sub
+        if first_draw:
+            transfer_data = subs_data[1:transfer+1,:,:]
+            transfer_labels = subs[1:transfer+1,:]
+            first_draw = False
+        else:
+            transfer_data = np.vstack((transfer_data, subs_data[1:transfer+1,:,:]))
+            transfer_labels = np.vstack((transfer_labels, subs[1:transfer+1,:]))
+
+        avg[0,i-1,:,:] = subs_data[1:transfer+1,:,:].mean(axis=0)
+
+    return transfer_data, transfer_labels, avg, avg_labels
 
 def calc_convolution(input_size=256,layers=2, filter_size =32, kernel = 4, kernel_p = 2, stride = 2, stride_p = 2, padding = 1, padding_p = 0, pooling = False):
         
@@ -334,17 +372,27 @@ def dataload():
     test_labels = np.load("test_label_31_40.npy").astype(np.int32)
 
     batch_size=32
-
+    n = 12                   # Number of labels
+    transfer = 64    # Number of test trials that needs to be transfer 
     #train_data = np.transpose(train_data, (1,2,0))
 
     train_data = train_data*1e5
     test_data = test_data*1e5
 
-    avg, avg_labels = average(train_data, train_labels)
-    avg_test, avg_labels_test = average_2(test_data, test_labels)
+    avg, avg_labels = average(train_data, train_labels, n)
+    avg_test, avg_labels_test = average_2(test_data, test_labels, n)
+
+    if transfer > 0:
+        transfer_data, transfer_labels, transfer_avg_data, transfer_avg_labels  = test_transfer(data=test_data, labels=test_labels, n=n, transfer=transfer, target_bin=1, target_sub=31)
+        #print(transfer_data.shape[:])
+        train_data = np.vstack((train_data, transfer_data))
+        train_labels = np.vstack((train_labels, transfer_labels))
+        avg = np.vstack((avg, transfer_avg_data))
+        avg_labels = np.vstack((avg_labels, transfer_avg_labels))
 
     train_dataset = EEGDataset(train_data, train_labels)
     test_dataset = EEGDataset(test_data, test_labels)
+    #transfer_dataset = EEGDataset(transfer_data, transfer_labels)
 
     avg_dataset = EEGDataset2(avg, avg_labels)
     avg_dataset_test = EEGDataset2(avg_test, avg_labels_test)
@@ -359,25 +407,32 @@ def dataload():
     #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
 
+    transfer_transform = transforms.Compose([
+    transforms.ToTensor(),
+    #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ])
+
     train_dataset.transform = train_transform
     test_dataset.transform = test_transform
+    #transfer_dataset.transform = transfer_transform
 
     m=len(train_dataset)
 
     #print(test_dataset[:,1])
-
-    train_data, val_data = random_split(train_dataset, [math.floor(m*0.8), math.ceil(m*0.2)])
+    train_data = train_dataset
+    val_data = test_dataset
+    #train_data, val_data = random_split(train_dataset, [math.floor(m*0.8), math.ceil(m*0.2)])
     #print(train_data[:5])
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,shuffle=True)
-    valid_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size)
+    valid_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size,shuffle=True)
 
     return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels
     #return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test
 
 if __name__ == "__main__":
-    in_channels = [35,64]
-    out_channels= [64,128]
+    in_channels = [35,100]
+    out_channels= [100,100]
 
     layers=2
     kernel = 3
@@ -388,7 +443,7 @@ if __name__ == "__main__":
     padding_p = 0
     pooling = True
     nhead = 8
-    num_epochs = 3
+    num_epochs = 10
     
     encoder_list, decoder_list, transformer_in = calc_convolution(layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p, padding = padding, padding_p = padding_p, pooling = pooling) #Stride can't be change do to BO
     print(encoder_list, decoder_list)
@@ -405,6 +460,5 @@ if __name__ == "__main__":
     dataloader = train_loader
     
 
-    model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=5)   
-    #model.to(device)
+    model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=12)   
     model2 = model.train(num_epochs=num_epochs) #dataloader, loss_fn, optimizer,n=10))
