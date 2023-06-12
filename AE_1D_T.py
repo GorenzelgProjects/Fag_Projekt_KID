@@ -67,7 +67,7 @@ class AET(nn.Module):
         return decoded
 
 class AE(nn.Module):
-    def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], nhead=8, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
+    def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], nhead=0, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
         super(AE, self).__init__()
 
         #in_channels = [35,64]
@@ -75,7 +75,7 @@ class AE(nn.Module):
         
         # Encoder layers
         self.encoder = nn.Sequential(
-            nn.Dropout(p=0.2),
+            #nn.Dropout(p=0.2),
             nn.Conv1d(in_channels=in_channels[0], out_channels=out_channels[0], kernel_size=kernel, stride=stride, padding=padding),
             #nn.ReLU(),
             nn.Tanh(),
@@ -192,8 +192,9 @@ class Epoch:
             self.diz_loss['train_loss'].append(train_loss)
             self.diz_loss['val_loss'].append(val_loss)
         #self.plot_ae_outputs()
-        self.plot_channels()
-        self.plot_losses()
+        if verbose:
+            self.plot_channels()
+            self.plot_losses()
         
     
     def plot_ae_outputs(self):
@@ -257,7 +258,7 @@ class Epoch:
         avg_outputs_test = avg_outputs_test[0,0].numpy()
 
         avg_outputs = self.avg_dataset[:][0]       
-        avg_outputs = avg_outputs[30,0].numpy()
+        avg_outputs = avg_outputs[0,0].numpy()
 
         with torch.no_grad():
             rec_img  = self.model(img.to(self.device))
@@ -511,11 +512,11 @@ if __name__ == "__main__":
     padding_p = 0
     pooling = True
     nhead = 8
-    num_epochs = 1
+    num_epochs = 10
 
     batch_size=32
     n = 12                   # Number of labels
-    transfer = 50    # Number of test trials that needs to be transfer 
+    transfer = 0    # Number of test trials that needs to be transfer 
 
     
     encoder_list, decoder_list, transformer_in = calc_convolution(layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p, padding = padding, padding_p = padding_p, pooling = pooling) #Stride can't be change do to BO

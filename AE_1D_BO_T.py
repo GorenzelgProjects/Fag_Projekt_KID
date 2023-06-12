@@ -1,5 +1,5 @@
 #from autoencoder_1D import Epoch, EEGAutoencoder, EEGDataset,EEGDataset2, dataload, calc_convolution
-from AE_1D_T import Epoch, AET, EEGDataset,EEGDataset2, dataload, calc_convolution
+from AE_1D_T import Epoch, AET,AE, EEGDataset,EEGDataset2, dataload, calc_convolution
 #from Save_BO import SaveData
 import matplotlib.pyplot as plt # plotting library
 import numpy as np # this module is useful to work with numerical arrays
@@ -22,6 +22,11 @@ stride = 1
 stride_p = 2 
 padding = 1
 padding_p = 0 
+#criterion = nn.L1Loss()
+
+batch_size=32
+n = 12                   # Number of labels
+transfer = 0
 
 
 nhead = tuple([4,8,16,32])
@@ -40,21 +45,19 @@ optimizer = tuple(np.arange(1,3,1))
 #padding = tuple([0,1,2]) 
 #padding_p = tuple([0,0]) 
 
-domain = [{'name': 'nhead', 'type': 'discrete', 'domain': nhead},       #0                           #1
-          {'name': 'kernel', 'type': 'discrete', 'domain': kernel},                             #1         
+domain = [{'name': 'nhead', 'type': 'discrete', 'domain': nhead},                               #1         
           {'name': 'learning_rate', 'type': 'discrete', 'domain': learning_rate},               #2
           {'name': 'weight_decay', 'type': 'discrete', 'domain': weight_decay},                 #3
-          {'name': 'criterion', 'type': 'discrete', 'domain': criterion},                       #4
-          {'name': 'optimizer', 'type': 'discrete', 'domain': optimizer}                        #5
+          {'name': 'optimizer', 'type': 'discrete', 'domain': optimizer}                        #4
          ]
 
-train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload()
+train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload(batch_size=batch_size, n=n, transfer=transfer)
 dataloader = train_loader
 
 def objective_function(x):
     param = x[0]
-    in_channels = [35,64]
-    out_channels= [64,128]
+    in_channels = [35,128]
+    out_channels= [128,128]
     encoder_list, decoder_list, transformer_in = calc_convolution(filter_size=int(param[0]),
                                                      layers=int(layers), 
                                                      kernel = int(kernel), 
@@ -69,16 +72,12 @@ def objective_function(x):
     # log2/sqrt and gini/entropy
     
 
-    #print(param)
-    #print(int(param[0]),param[1])
-    if param[4] == 1:
-        criterion = nn.L1Loss()
-    elif param[4] == 2 or 3:
-        criterion = nn.MSELoss()
+    #elif param[4] == 2 or 3:
+    #    criterion = nn.MSELoss()
     #elif param[4] == 3:
     #    criterion = nn.CosineEmbeddingLoss()
-    elif param[4] == 4:
-        criterion = nn.CrossEntropyLoss()
+    #elif param[4] == 4:
+    #    criterion = nn.CrossEntropyLoss()
     
 
     autoencoder = AET(encoder_list=0,
@@ -94,21 +93,24 @@ def objective_function(x):
                 padding = int(padding), 
                 padding_p = int(padding_p), 
                 pooling = True)
-
+    
+   
     params_to_optimize = [
     {'params': autoencoder.parameters()},
     ]
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     #autoencoder = EEGAutoencoder()                                  #We've merely set these to 
-    criterion = criterion
+    #criterion = nn.L1Loss()
+    criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=param[2],weight_decay=param[3])
 
-    #autoencoder.to(device)
+    autoencoder.to(device)
    
-    num_epochs = 2
+    num_epochs = 5
+    
+    
 
-    model = Epoch(autoencoder, device, train_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=5)
-        
+    model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=n)      
     #model.to(device)
     model.train(num_epochs=num_epochs) #dataloader, loss_fn, optimizer,n=10))
 
@@ -135,10 +137,7 @@ print("The best parameters obtained:"
       + domain[0]["name"] + "=" + str(x_best[0]) + "," 
       + domain[1]["name"] + "=" + str(x_best[1]) + "," 
       + domain[2]["name"] + "=" + str(x_best[2]) + "," 
-      + domain[3]["name"] + "=" + str(x_best[3]) + "," 
-      + domain[4]["name"] + "=" + str(x_best[4]) + "," 
-      + domain[5]["name"] + "=" + str(x_best[5]) + ","  
-    )
+      + domain[3]["name"] + "=" + str(x_best[3]))
 
 
 #return x_best, architecture, hyperparameters
