@@ -7,6 +7,7 @@ import math
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set()
+import time
 
 class AET(nn.Module):
     def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], nhead=8, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
@@ -64,6 +65,57 @@ class AET(nn.Module):
         transformed = self.transformer(encoded)
         decoded = self.decoder(transformed)
         return decoded
+
+class AE(nn.Module):
+    def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], nhead=8, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
+        super(AE, self).__init__()
+
+        #in_channels = [35,64]
+        #out_channels= [64,128]
+        
+        # Encoder layers
+        self.encoder = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Conv1d(in_channels=in_channels[0], out_channels=out_channels[0], kernel_size=kernel, stride=stride, padding=padding),
+            #nn.ReLU(),
+            nn.Tanh(),
+            nn.MaxPool1d(kernel_size=kernel_p, stride=stride_p),
+            #nn.AvgPool1d(kernel_size=kernel_p, stride=stride_p),
+            nn.Conv1d(in_channels=in_channels[1], out_channels=out_channels[1], kernel_size=kernel, stride=stride, padding=padding),
+            #nn.ReLU(),
+            nn.Tanh(),
+            nn.MaxPool1d(kernel_size=kernel_p, stride=stride_p),
+            #nn.AvgPool1d(kernel_size=kernel_p, stride=stride_p),
+            #nn.Conv1d(in_channels=in_channels[2], out_channels=out_channels[2], kernel_size=kernel, stride=stride, padding=padding),
+            #nn.ReLU(),
+            #nn.Tanh(),
+        )
+        
+        # Decoder layers
+        self.decoder = nn.Sequential(
+            #nn.Upsample(size=decoder_list[0], mode='nearest'),
+            #nn.ReLU(),
+            #nn.Tanh(),
+            #nn.Conv1d(in_channels=out_channels[2], out_channels=in_channels[2], kernel_size=kernel, stride=stride, padding=padding),
+
+            
+            nn.Upsample(size=decoder_list[0], mode='nearest'),
+            #nn.ReLU(),
+            nn.Tanh(),
+            nn.Conv1d(in_channels=out_channels[1], out_channels=in_channels[1], kernel_size=kernel, stride=stride, padding=padding),
+            
+            
+            nn.Upsample(size=decoder_list[1], mode='nearest'),
+            #nn.ReLU(),
+            nn.Tanh(),
+            nn.Conv1d(in_channels=out_channels[0], out_channels=in_channels[0], kernel_size=kernel, stride=stride, padding=padding)
+        )
+
+    def forward(self, x):
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded
+
 
 class Epoch:
     
@@ -204,6 +256,9 @@ class Epoch:
 
         avg_outputs_test = avg_outputs_test[0,0].numpy()
 
+        avg_outputs = self.avg_dataset[:][0]       
+        avg_outputs = avg_outputs[30,0].numpy()
+
         with torch.no_grad():
             rec_img  = self.model(img.to(self.device))
 
@@ -213,15 +268,19 @@ class Epoch:
             c = rec[i,:]
             v = avg_outputs_test[i,:]
             o = original[i,:]
+            x = avg_outputs[i,:]
             rec[i,:] = (c - minimum[i]) / (maximum[i] - minimum[i])
             avg_outputs_test[i,:] = (v - minimum[i]) / (maximum[i] - minimum[i])
             original[i,:] = (o - minimum[i]) / (maximum[i] - minimum[i])
+            avg_outputs[i,:] = (x - minimum[i]) / (maximum[i] - minimum[i])
 
         x = np.arange(0,256)
         for i in range(35):
             displacement = i*2
             plt.plot(x,original[i,:]+displacement, color='grey', alpha=0.5)
-            plt.plot(x,avg_outputs_test[i,:]+displacement, color='black')
+            plt.plot(x,avg_outputs_test[i,:]+displacement, color='black',alpha=0.7)
+            #plt.plot(x,avg_outputs[i,:]+displacement, color='green',alpha=0.7)
+            #plt.plot(x,avg_outputs_test[i,:]+displacement, color='black')
             plt.plot(x,rec[i,:]+displacement, color='tomato', alpha=0.7)
             label_pos.append(avg_outputs_test[i,:].mean()+displacement)
             temp_name = "EEG " + str(i+1)
@@ -320,22 +379,33 @@ def test_transfer(data,labels,n,transfer=0, target_bin=1, target_sub=31):
     #for i in range(1,n+1):
     for i in range(1,n+1):
         bins = labels[np.where(labels[:,0] == i)]
+
+        bin_idx = np.where(labels[:,0] == i)[0]
         bins_data = data[np.where(labels[:,0] == i)]
         subs = bins[np.where(bins[:,1] == target_sub)]
+
+        sub_idx = bin_idx[np.where(bins[:,1] == target_sub)]
+
+
         subs_data = bins_data[np.where(bins[:,1] == target_sub)]
         avg_labels[0,0] = i
         avg_labels[0,1] = target_sub
         if first_draw:
             transfer_data = subs_data[1:transfer+1,:,:]
             transfer_labels = subs[1:transfer+1,:]
+            sub_data = sub_idx[1:transfer+1]
             first_draw = False
         else:
             transfer_data = np.vstack((transfer_data, subs_data[1:transfer+1,:,:]))
             transfer_labels = np.vstack((transfer_labels, subs[1:transfer+1,:]))
+            sub_data = np.append(sub_data, sub_idx[1:transfer+1])
 
         avg[0,i-1,:,:] = subs_data[1:transfer+1,:,:].mean(axis=0)
 
-    return transfer_data, transfer_labels, avg, avg_labels
+    data = np.delete(data, sub_data, axis=0)
+    labels = np.delete(labels, sub_data, axis=0)
+
+    return transfer_data, transfer_labels, avg, avg_labels, data, labels
 
 def calc_convolution(input_size=256,layers=2, filter_size =32, kernel = 4, kernel_p = 2, stride = 2, stride_p = 2, padding = 1, padding_p = 0, pooling = False):
         
@@ -365,7 +435,7 @@ def calc_convolution(input_size=256,layers=2, filter_size =32, kernel = 4, kerne
         
         return encoder, decoder, transformer_in
 
-def dataload(batch_size = 32, n = 12, transfer = 64):
+def dataload(batch_size = 32, n = 12, transfer = 0):
     train_data = np.load("train_data_1_30.npy")
     train_labels = np.load("train_label_1_30.npy").astype(np.int32)
     test_data = np.load("test_data_31_40.npy")
@@ -378,12 +448,15 @@ def dataload(batch_size = 32, n = 12, transfer = 64):
     avg_test, avg_labels_test = average_2(test_data, test_labels, n)
 
     if transfer > 0:
-        transfer_data, transfer_labels, transfer_avg_data, transfer_avg_labels  = test_transfer(data=test_data, labels=test_labels, n=n, transfer=transfer, target_bin=1, target_sub=31)
-        #print(transfer_data.shape[:])
-        train_data = np.vstack((train_data, transfer_data))
-        train_labels = np.vstack((train_labels, transfer_labels))
-        avg = np.vstack((avg, transfer_avg_data))
-        avg_labels = np.vstack((avg_labels, transfer_avg_labels))
+        for sub in range(31,41,1):
+            transfer_data, transfer_labels, transfer_avg_data, transfer_avg_labels, test_data, test_labels = test_transfer(data=test_data, labels=test_labels, n=n, transfer=transfer, target_bin=1, target_sub=sub)
+            #print(transfer_data.shape[:])
+            train_data = np.vstack((train_data, transfer_data))
+            train_labels = np.vstack((train_labels, transfer_labels))
+            avg = np.vstack((avg, transfer_avg_data))
+            avg_labels = np.vstack((avg_labels, transfer_avg_labels))
+            test_data = test_data.copy()
+            test_labels = test_labels.copy()
 
     train_dataset = EEGDataset(train_data, train_labels)
     test_dataset = EEGDataset(test_data, test_labels)
@@ -415,7 +488,7 @@ def dataload(batch_size = 32, n = 12, transfer = 64):
 
     #print(test_dataset[:,1])
     train_data = train_dataset
-    val_data = test_dataset
+    val_data = train_dataset
     #train_data, val_data = random_split(train_dataset, [math.floor(m*0.8), math.ceil(m*0.2)])
     #print(train_data[:5])
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,shuffle=True)
@@ -426,8 +499,8 @@ def dataload(batch_size = 32, n = 12, transfer = 64):
     #return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test
 
 if __name__ == "__main__":
-    in_channels = [35,100]
-    out_channels= [100,100]
+    in_channels = [35,128]
+    out_channels= [128,128]
 
     layers=2
     kernel = 3
@@ -438,23 +511,24 @@ if __name__ == "__main__":
     padding_p = 0
     pooling = True
     nhead = 8
-    num_epochs = 10
+    num_epochs = 1
 
     batch_size=32
     n = 12                   # Number of labels
-    transfer = 0    # Number of test trials that needs to be transfer 
+    transfer = 50    # Number of test trials that needs to be transfer 
 
     
     encoder_list, decoder_list, transformer_in = calc_convolution(layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p, padding = padding, padding_p = padding_p, pooling = pooling) #Stride can't be change do to BO
-    print(encoder_list, decoder_list)
+    
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
+    #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
+    autoencoder = AE(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
     autoencoder.to(device)
     #criterion = nn.L1Loss()
     criterion = nn.MSELoss()
     #criterion = nn.BCELoss()
-    optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
-    #optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
+    #optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
+    optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
 
     train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload(batch_size=batch_size, n=n, transfer=transfer)
     dataloader = train_loader
