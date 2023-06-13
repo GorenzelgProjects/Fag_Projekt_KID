@@ -6,6 +6,7 @@ from torchvision import transforms
 import math
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
 sns.set()
 import time
 
@@ -119,7 +120,7 @@ class AE(nn.Module):
 
 class Epoch:
     
-    def __init__(self, autoencoder, device, dataloader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,test_dataset, test_labels,n=10):
+    def __init__(self, autoencoder, device, dataloader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,test_dataset, test_labels,n=10, PATH=''):
     #def __init__(self, autoencoder, device, dataloader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,n=10):
         self.model = autoencoder
         self.device = device
@@ -135,6 +136,7 @@ class Epoch:
         self.test_dataset = test_dataset
         self.test_labels = test_labels
         self.n = n
+        self.PATH = PATH
         super().__init__()
 
     ### Training function
@@ -191,11 +193,14 @@ class Epoch:
             print('\n EPOCH {}/{} \t train loss {} \t val loss {}'.format(epoch + 1, num_epochs,train_loss,val_loss))
             self.diz_loss['train_loss'].append(train_loss)
             self.diz_loss['val_loss'].append(val_loss)
+
         #self.plot_ae_outputs()
         if verbose:
+            self.path_plot = self.PATH + "/" + str(val_loss)
+            os.makedirs(self.path_plot)
             self.plot_channels()
             self.plot_losses()
-        
+
     
     def plot_ae_outputs(self):
         plt.figure(figsize=(16,4.5))
@@ -242,7 +247,13 @@ class Epoch:
         
     def plot_channels(self):
         label_pos = []
-        label_name = []
+        label_name = ["FP1","F3","F7","FC3","C3",
+                       "C5","P3","P7","PO7","PO3",
+                       "O1","Oz","Pz","CPz","FP2",
+                       "Fz","F4","F8","FC4","FCz",
+                       "Cz","C4","C6","P4","P8",
+                       "PO8","PO4","O2","HEOG_left","HEOG_right",
+                       "VEOG_lower","(corr)HEOG","(corr)VEOG_lower","(uncorr)HEOG","(uncorr)VEOG"]
 
         targets = self.test_labels[:,0]
         t_idx = {1:np.where(targets==1)[0]}
@@ -278,19 +289,40 @@ class Epoch:
         x = np.arange(0,256)
         for i in range(35):
             displacement = i*2
+
             plt.plot(x,original[i,:]+displacement, color='grey', alpha=0.5)
+            label_pos.append(avg_outputs_test[i,:].mean()+displacement)
+            
+
+        plt.yticks(label_pos, label_name, fontsize=9)
+        plt.xlim([0, 256])
+        temp_name = self.path_plot + "/" + "orginal.png"
+        plt.savefig(temp_name)
+        plt.clf()
+        label_pos = []
+        for i in range(35):
+            displacement = i*2
             plt.plot(x,avg_outputs_test[i,:]+displacement, color='black',alpha=0.7)
-            #plt.plot(x,avg_outputs[i,:]+displacement, color='green',alpha=0.7)
-            #plt.plot(x,avg_outputs_test[i,:]+displacement, color='black')
+            label_pos.append(avg_outputs_test[i,:].mean()+displacement)
+
+        plt.yticks(label_pos, label_name, fontsize=9)
+        plt.xlim([0, 256])
+        temp_name = self.path_plot + "/" + "average.png"
+        plt.savefig(temp_name)
+        plt.clf()
+
+        label_pos = []
+        for i in range(35):
+            displacement = i*2
+
             plt.plot(x,rec[i,:]+displacement, color='tomato', alpha=0.7)
             label_pos.append(avg_outputs_test[i,:].mean()+displacement)
-            temp_name = "EEG " + str(i+1)
-            label_name.append(temp_name)
 
-        plt.yticks(label_pos, label_name)
+        plt.yticks(label_pos, label_name, fontsize=9)
         plt.xlim([0, 256])
-        #plt.yticks(y, labels, rotation='vertical')
-        plt.show()
+        temp_name = self.path_plot + "/" + "recon.png"
+        plt.savefig(temp_name)
+        plt.clf()
 
     def plot_losses(self):
         # Plot losses
@@ -302,7 +334,9 @@ class Epoch:
         #plt.grid()
         plt.legend()
         #plt.title('loss')
-        plt.show()
+        temp_name = self.path_plot + "/" + "loss.png"
+        plt.savefig(temp_name)
+        plt.clf()
 
 
 class EEGDataset(Dataset):
@@ -446,6 +480,19 @@ def dataload(batch_size = 32, n = 12, transfer = 0):
     test_data = test_data*1e5
 
     avg, avg_labels = average(train_data, train_labels, n)
+
+    grand_avg = avg.mean(axis=0)
+
+    comb_avg = np.zeros_like(avg)
+    for i in range(len(avg)):
+        for j in range(len(grand_avg)):
+            temp_1 = np.expand_dims(avg[i,j,:,:], axis=0)
+            temp_2 = np.expand_dims(grand_avg[j,:,:], axis=0)
+            temp_avg = np.vstack((temp_1,temp_2))
+            comb_avg[i,j,:,:] = temp_avg.mean(axis=0)
+
+    #avg = comb_avg
+
     avg_test, avg_labels_test = average_2(test_data, test_labels, n)
 
     if transfer > 0:
@@ -512,28 +559,28 @@ if __name__ == "__main__":
     padding_p = 0
     pooling = True
     nhead = 8
-    num_epochs = 10
+    num_epochs = 2
 
     batch_size=32
     n = 12                   # Number of labels
     transfer = 0    # Number of test trials that needs to be transfer 
-
+    #path = "./AE_plots"
+    path = "./AET_plots"
     
     encoder_list, decoder_list, transformer_in = calc_convolution(layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p, padding = padding, padding_p = padding_p, pooling = pooling) #Stride can't be change do to BO
     
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
-    autoencoder = AE(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
+    autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
     autoencoder.to(device)
     #criterion = nn.L1Loss()
     criterion = nn.MSELoss()
     #criterion = nn.BCELoss()
-    #optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
-    optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
+    optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
+    #optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
 
     train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload(batch_size=batch_size, n=n, transfer=transfer)
     dataloader = train_loader
-    
 
-    model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=n)   
-    model2 = model.train(num_epochs=num_epochs) #dataloader, loss_fn, optimizer,n=10))
+    model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=n, PATH=path)   
+    model2 = model.train(num_epochs=num_epochs, verbose=True) #dataloader, loss_fn, optimizer,n=10))
