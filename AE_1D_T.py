@@ -290,38 +290,51 @@ class Epoch:
         for i in range(35):
             displacement = i*2
 
-            plt.plot(x,original[i,:]+displacement, color='grey', alpha=0.5)
+            plt.plot(x,original[i,:]+displacement, color='grey', alpha=0.5, linewidth=0.6)
             label_pos.append(avg_outputs_test[i,:].mean()+displacement)
             
 
         plt.yticks(label_pos, label_name, fontsize=9)
         plt.xlim([0, 256])
         temp_name = self.path_plot + "/" + "orginal.png"
-        plt.savefig(temp_name)
+        plt.savefig(temp_name, dpi=500)
         plt.clf()
         label_pos = []
         for i in range(35):
             displacement = i*2
-            plt.plot(x,avg_outputs_test[i,:]+displacement, color='black',alpha=0.7)
+            plt.plot(x,avg_outputs_test[i,:]+displacement, color='black',alpha=0.7, linewidth=0.6)
             label_pos.append(avg_outputs_test[i,:].mean()+displacement)
 
         plt.yticks(label_pos, label_name, fontsize=9)
         plt.xlim([0, 256])
         temp_name = self.path_plot + "/" + "average.png"
-        plt.savefig(temp_name)
+        plt.savefig(temp_name, dpi=500)
+        plt.clf()
+
+        label_pos = []
+        for i in range(35):
+            displacement = i*2
+            plt.plot(x,avg_outputs_test[i,:]+displacement, color='black',alpha=0.7, linewidth=0.6)
+            plt.plot(x,rec[i,:]+displacement, color='tomato', alpha=0.7, linewidth=0.6)
+            label_pos.append(avg_outputs_test[i,:].mean()+displacement)
+
+        plt.yticks(label_pos, label_name, fontsize=9)
+        plt.xlim([0, 256])
+        temp_name = self.path_plot + "/" + "avg_recon.png"
+        plt.savefig(temp_name, dpi=500)
         plt.clf()
 
         label_pos = []
         for i in range(35):
             displacement = i*2
 
-            plt.plot(x,rec[i,:]+displacement, color='tomato', alpha=0.7)
+            plt.plot(x,rec[i,:]+displacement, color='tomato', alpha=0.7, linewidth=0.6)
             label_pos.append(avg_outputs_test[i,:].mean()+displacement)
 
         plt.yticks(label_pos, label_name, fontsize=9)
         plt.xlim([0, 256])
         temp_name = self.path_plot + "/" + "recon.png"
-        plt.savefig(temp_name)
+        plt.savefig(temp_name, dpi=500)
         plt.clf()
 
     def plot_losses(self):
@@ -335,7 +348,7 @@ class Epoch:
         plt.legend()
         #plt.title('loss')
         temp_name = self.path_plot + "/" + "loss.png"
-        plt.savefig(temp_name)
+        plt.savefig(temp_name, dpi=500)
         plt.clf()
 
 
