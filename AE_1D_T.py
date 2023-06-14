@@ -37,10 +37,19 @@ class AET(nn.Module):
         )
 
         self.transformer_encoder = nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1], dropout=0.2)
+        self.transformer_decoder = nn.TransformerDecoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1], dropout=0.2)
         
-        self.transformer = nn.Sequential(
-            nn.TransformerEncoder(self.transformer_encoder, num_layers=3)
-            )
+        #self.transformer_e = nn.Sequential(
+         #   nn.TransformerEncoder(self.transformer_encoder, num_layers=3))
+        
+        #self.transformer_d = nn.Sequential(
+          #  nn.TransformerDecoder(self.transformer_decoder, num_layers=3))
+        
+        self.transformer_e = nn.TransformerEncoder(self.transformer_encoder, num_layers=3)
+        
+        self.transformer_d = nn.TransformerDecoder(self.transformer_decoder, num_layers=3)
+        
+        
         
         # Decoder layers
         self.decoder = nn.Sequential(
@@ -64,8 +73,10 @@ class AET(nn.Module):
 
     def forward(self, x):
         encoded = self.encoder(x)
-        transformed = self.transformer(encoded)
-        decoded = self.decoder(transformed)
+        transform_e = self.transformer_e(encoded)
+        #transform_e = self.transformer_encoder
+        transform_d = self.transformer_d(transform_e,encoded)
+        decoded = self.decoder(transform_d)
         return decoded
 
 class AE(nn.Module):
@@ -685,7 +696,7 @@ if __name__ == "__main__":
     mse_transfer = []
     mse_loss_list = []
     mse_avg_loss = []
-    for i in range(10,60,10):
+    for i in range(0,10,10):
         print("transfer: ", i)
         transfer = i
         #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
@@ -703,14 +714,15 @@ if __name__ == "__main__":
         model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=n, PATH=path, paradigm=paradigm)   
         model2 = model.train(num_epochs=num_epochs, verbose=True) #dataloader, loss_fn, optimizer,n=10))
 
+        if i > 0:
+            
+            mse_transfer.append(i)
+            mse_loss_list.append(model.diz_loss['val_loss'][-1])
 
-        mse_transfer.append(i)
-        mse_loss_list.append(model.diz_loss['val_loss'][-1])
+            true_avg = avg_dataset_test[:][0].to(device)
+            transfer_avg = avg_dataset[30:][0].to(device)
 
-        true_avg = avg_dataset_test[:][0].to(device)
-        transfer_avg = avg_dataset[30:][0].to(device)
-
-        loss = criterion(true_avg, transfer_avg)  # Reconstruction loss
-        mse_avg_loss.append(loss.item())
+            loss = criterion(true_avg, transfer_avg)  # Reconstruction loss
+            mse_avg_loss.append(loss.item())
 
     plot_mse(mse_avg_loss, mse_loss_list, mse_transfer)
