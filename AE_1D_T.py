@@ -5,6 +5,7 @@ import numpy as np
 from torchvision import transforms
 import math
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
 import seaborn as sns
 import os
 sns.set()
@@ -120,7 +121,7 @@ class AE(nn.Module):
 
 class Epoch:
     
-    def __init__(self, autoencoder, device, dataloader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,test_dataset, test_labels,n=10, PATH=''):
+    def __init__(self, autoencoder, device, dataloader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,test_dataset, test_labels,n=10, PATH='', paradigm=False):
     #def __init__(self, autoencoder, device, dataloader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, loss_fn, optimizer,n=10):
         self.model = autoencoder
         self.device = device
@@ -137,6 +138,16 @@ class Epoch:
         self.test_labels = test_labels
         self.n = n
         self.PATH = PATH
+
+        if paradigm:
+            self.bin_diff = 11
+            self.sub_diff = 1
+            self.target_val = 11
+        else:
+            self.bin_diff = 1
+            self.sub_diff = 31
+            self.target_val = 1
+
         super().__init__()
 
     ### Training function
@@ -170,9 +181,10 @@ class Epoch:
                 inputs, label = test_data  # Assuming your dataloader provides (input, label) pairs
                 #inputs = inputs.swapaxes(0,1)
                 inputs = inputs.to(self.device)
+
                 avg_outputs_test = self.avg_dataset_test[:][0]
         
-                avg_outputs_test = avg_outputs_test[label[:,1]-1-30,label[:,0]-1].to(self.device)
+                avg_outputs_test = avg_outputs_test[label[:,1]-self.sub_diff,label[:,0]-self.bin_diff].to(self.device)
 
                 outputs = self.model(inputs)
 
@@ -256,7 +268,7 @@ class Epoch:
                        "VEOG_lower","(corr)HEOG","(corr)VEOG_lower","(uncorr)HEOG","(uncorr)VEOG"]
 
         targets = self.test_labels[:,0]
-        t_idx = {1:np.where(targets==1)[0]}
+        t_idx = {1:np.where(targets==self.target_val)[0]}
         val = t_idx[1][0]
         original = self.test_dataset[val][0].numpy()
         img = self.test_dataset[val][0].unsqueeze(0)
@@ -420,6 +432,66 @@ def average_2(data,labels,n):
 
     return avg, avg_labels
 
+def paradigm_split(data,labels,n):
+    first_draw = True
+    first_test = True
+    
+    avg = np.zeros((40,n-2,35,256))
+    avg_labels = np.zeros((40,2))
+    
+    avg_test = np.zeros((40,2,35,256))
+    avg_labels_test = np.zeros((40,2))
+    
+    #for i in range(1,n+1):
+    for i in range(1,n+1):
+        
+            
+        subs = labels[np.where(labels[:,0] == i)]
+
+        sub_idx = np.where(labels[:,0] == i)[0]
+        subs_data = data[np.where(labels[:,0] == i)]
+
+        #avg_labels[0,0] = i
+        #avg_labels[0,1] = target_sub
+        
+        if i > 10:
+            if first_test:
+                test_data = subs_data
+                test_labels = subs
+                sub_data = sub_idx
+                first_test = False
+            else:
+                test_data = np.vstack((test_data, subs_data))
+                test_labels = np.vstack((test_labels, subs))
+                sub_data = np.append(sub_data, sub_idx)
+                
+            avg_test[:,i-11,:,:] = subs_data.mean(axis=0)
+            
+            for j in range(1,41):
+                avg_labels_test[j-1,0] = i
+                avg_labels_test[j-1,1] = j
+        else:
+            if first_draw:
+                train_data = subs_data
+                train_labels = subs
+                sub_data = sub_idx
+                first_draw = False
+            else:
+                train_data = np.vstack((train_data, subs_data))
+                train_labels = np.vstack((train_labels, subs))
+                sub_data = np.append(sub_data, sub_idx)
+            
+            avg[:,i-1,:,:] = subs_data.mean(axis=0)
+            
+            for j in range(1,41):
+                avg_labels[j-1,0] = i
+                avg_labels[j-1,1] = j
+
+        #avg[0,i-1,:,:] = subs_data[1:transfer+1,:,:].mean(axis=0)
+
+
+    return train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test
+
 def test_transfer(data,labels,n,transfer=0, target_bin=1, target_sub=31):
     first_draw = True
     avg = np.zeros((1,n,35,256))
@@ -450,8 +522,9 @@ def test_transfer(data,labels,n,transfer=0, target_bin=1, target_sub=31):
 
         avg[0,i-1,:,:] = subs_data[1:transfer+1,:,:].mean(axis=0)
 
-    data = np.delete(data, sub_data, axis=0)
-    labels = np.delete(labels, sub_data, axis=0)
+    #data = np.delete(data, sub_data, axis=0)
+    #labels = np.delete(labels, sub_data, axis=0)
+
 
     return transfer_data, transfer_labels, avg, avg_labels, data, labels
 
@@ -483,30 +556,52 @@ def calc_convolution(input_size=256,layers=2, filter_size =32, kernel = 4, kerne
         
         return encoder, decoder, transformer_in
 
-def dataload(batch_size = 32, n = 12, transfer = 0):
-    train_data = np.load("train_data_1_30.npy")
-    train_labels = np.load("train_label_1_30.npy").astype(np.int32)
-    test_data = np.load("test_data_31_40.npy")
-    test_labels = np.load("test_label_31_40.npy").astype(np.int32)
+def plot_mse(avg, rec, transfer_list):
+    plt.plot(transfer_list, avg, label="average_loss")
+    plt.scatter(transfer_list, avg)
+    plt.plot(transfer_list, rec, label="reconstruction_loss")
+    plt.scatter(transfer_list, rec)
+    plt.legend()
+    plt.show()
 
-    train_data = train_data*1e5
-    test_data = test_data*1e5
 
-    avg, avg_labels = average(train_data, train_labels, n)
+def dataload(batch_size = 32, n = 12, transfer = 0, paradigm = False):
 
-    grand_avg = avg.mean(axis=0)
+    if paradigm:
+        all_data = np.load("all_data.npy")
+        all_labels = np.load("all_labels.npy").astype(np.int32)
 
-    comb_avg = np.zeros_like(avg)
-    for i in range(len(avg)):
-        for j in range(len(grand_avg)):
-            temp_1 = np.expand_dims(avg[i,j,:,:], axis=0)
-            temp_2 = np.expand_dims(grand_avg[j,:,:], axis=0)
-            temp_avg = np.vstack((temp_1,temp_2))
-            comb_avg[i,j,:,:] = temp_avg.mean(axis=0)
+        train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test = paradigm_split(all_data, all_labels, n)
+        
+        train_data = train_data*1e5
+        test_data = test_data*1e5
+        
+        print("Paradigm ",train_data.shape[:])
 
-    #avg = comb_avg
+    else:
+        train_data = np.load("train_data_1_30.npy")
+        train_labels = np.load("train_label_1_30.npy").astype(np.int32)
+        test_data = np.load("test_data_31_40.npy")
+        test_labels = np.load("test_label_31_40.npy").astype(np.int32)
+    
+        train_data = train_data*1e5
+        test_data = test_data*1e5
 
-    avg_test, avg_labels_test = average_2(test_data, test_labels, n)
+        avg, avg_labels = average(train_data, train_labels, n)
+
+        grand_avg = avg.mean(axis=0)
+
+        comb_avg = np.zeros_like(avg)
+        for i in range(len(avg)):
+            for j in range(len(grand_avg)):
+                temp_1 = np.expand_dims(avg[i,j,:,:], axis=0)
+                temp_2 = np.expand_dims(grand_avg[j,:,:], axis=0)
+                temp_avg = np.vstack((temp_1,temp_2))
+                comb_avg[i,j,:,:] = temp_avg.mean(axis=0)
+
+        #avg = comb_avg
+
+        avg_test, avg_labels_test = average_2(test_data, test_labels, n)
 
     if transfer > 0:
         for sub in range(31,41,1):
@@ -518,6 +613,8 @@ def dataload(batch_size = 32, n = 12, transfer = 0):
             avg_labels = np.vstack((avg_labels, transfer_avg_labels))
             test_data = test_data.copy()
             test_labels = test_labels.copy()
+        
+
 
     train_dataset = EEGDataset(train_data, train_labels)
     test_dataset = EEGDataset(test_data, test_labels)
@@ -577,23 +674,43 @@ if __name__ == "__main__":
     batch_size=32
     n = 12                   # Number of labels
     transfer = 0    # Number of test trials that needs to be transfer 
+    paradigm = False
     #path = "./AE_plots"
     path = "./AET_plots"
     
     encoder_list, decoder_list, transformer_in = calc_convolution(layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p, padding = padding, padding_p = padding_p, pooling = pooling) #Stride can't be change do to BO
     
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
-    autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
-    autoencoder.to(device)
-    #criterion = nn.L1Loss()
-    criterion = nn.MSELoss()
-    #criterion = nn.BCELoss()
-    optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
-    #optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
 
-    train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload(batch_size=batch_size, n=n, transfer=transfer)
-    dataloader = train_loader
+    mse_transfer = []
+    mse_loss_list = []
+    mse_avg_loss = []
+    for i in range(10,60,10):
+        print("transfer: ", i)
+        transfer = i
+        #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
+        autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
+        autoencoder.to(device)
+        #criterion = nn.L1Loss()
+        criterion = nn.MSELoss()
+        #criterion = nn.BCELoss()
+        optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
+        #optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
 
-    model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=n, PATH=path)   
-    model2 = model.train(num_epochs=num_epochs, verbose=True) #dataloader, loss_fn, optimizer,n=10))
+        train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload(batch_size=batch_size, n=n, transfer=transfer, paradigm=paradigm)
+        dataloader = train_loader
+
+        model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=n, PATH=path, paradigm=paradigm)   
+        model2 = model.train(num_epochs=num_epochs, verbose=True) #dataloader, loss_fn, optimizer,n=10))
+
+
+        mse_transfer.append(i)
+        mse_loss_list.append(model.diz_loss['val_loss'][-1])
+
+        true_avg = avg_dataset_test[:][0].to(device)
+        transfer_avg = avg_dataset[30:][0].to(device)
+
+        loss = criterion(true_avg, transfer_avg)  # Reconstruction loss
+        mse_avg_loss.append(loss.item())
+
+    plot_mse(mse_avg_loss, mse_loss_list, mse_transfer)
