@@ -29,12 +29,10 @@ n = 12                   # Number of labels
 transfer = 0
 
 
-nhead = tuple([4,8,16,32])
-#kernel = tuple([3,4,5,6])
-learning_rate = tuple(np.arange(1,10,1)*1e-5)
-weight_decay = tuple(np.arange(1,10,1)*1e-1)
-criterion = tuple(np.arange(1,5,1))
-optimizer = tuple(np.arange(1,3,1))
+#nhead = tuple([4,8,16,32])
+learning_rate = (1*1e-5,1)
+weight_decay = (0.01,1)
+
 
 #encoded_space_dim = tuple([35,35])                      #Ranges
 #layers = tuple([3,3]) 
@@ -45,10 +43,13 @@ optimizer = tuple(np.arange(1,3,1))
 #padding = tuple([0,1,2]) 
 #padding_p = tuple([0,0]) 
 
-domain = [{'name': 'nhead', 'type': 'discrete', 'domain': nhead},                               #1         
-          {'name': 'learning_rate', 'type': 'discrete', 'domain': learning_rate},               #2
-          {'name': 'weight_decay', 'type': 'discrete', 'domain': weight_decay},                 #3
-          {'name': 'optimizer', 'type': 'discrete', 'domain': optimizer}                        #4
+#domain = [{'name': 'nhead', 'type': 'discrete', 'domain': nhead},                               #0         
+#          {'name': 'learning_rate', 'type': 'continuous', 'domain': learning_rate},               #1
+#          {'name': 'weight_decay', 'type': 'continuous', 'domain': weight_decay},                 #2
+#         ]
+
+domain = [{'name': 'learning_rate', 'type': 'continuous', 'domain': learning_rate},               #0
+          {'name': 'weight_decay', 'type': 'continuous', 'domain': weight_decay},                 #1
          ]
 
 train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload(batch_size=batch_size, n=n, transfer=transfer)
@@ -58,7 +59,7 @@ def objective_function(x):
     param = x[0]
     in_channels = [35,128]
     out_channels= [128,128]
-    encoder_list, decoder_list, transformer_in = calc_convolution(filter_size=int(param[0]),
+    encoder_list, decoder_list, transformer_in = calc_convolution(filter_size=int(35),
                                                      layers=int(layers), 
                                                      kernel = int(kernel), 
                                                      kernel_p = int(kernel_p), 
@@ -80,12 +81,12 @@ def objective_function(x):
     #    criterion = nn.CrossEntropyLoss()
     
 
-    autoencoder = AET(encoder_list=0,
+    autoencoder = AE(encoder_list=0,
                 decoder_list=decoder_list, 
                 transformer_in=transformer_in,
                 in_channels = in_channels, 
                 out_channels = out_channels, 
-                nhead = int(param[0]), 
+                nhead = 0,#int(param[0]), 
                 layers=int(layers), 
                 kernel = int(kernel), 
                 kernel_p = int(kernel_p), 
@@ -100,13 +101,14 @@ def objective_function(x):
     ]
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     #autoencoder = EEGAutoencoder()                                  #We've merely set these to 
-    #criterion = nn.L1Loss()
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(autoencoder.parameters(), lr=param[2],weight_decay=param[3])
+    criterion = nn.L1Loss()
+    #criterion = nn.MSELoss()
+    #optimizer = torch.optim.Adam(autoencoder.parameters(), lr=param[0],weight_decay=param[1])
+    optimizer = torch.optim.SGD(autoencoder.parameters(), lr=param[0],momentum=param[1])
 
     autoencoder.to(device)
    
-    num_epochs = 5
+    num_epochs = 8
     
     
 
@@ -127,17 +129,23 @@ opt = GPyOpt.methods.BayesianOptimization(f = objective_function,   # function t
                                             )
 opt.acquisition.exploration_weight=0.05
 
-opt.run_optimization(max_iter = 2) 
+opt.run_optimization(max_iter = 15) 
 
 x_best = opt.X[np.argmin(opt.Y)]
 print(x_best)
 
       
+#print("The best parameters obtained:" 
+#      + domain[0]["name"] + "=" + str(x_best[0]) + "," 
+#      + domain[1]["name"] + "=" + str(x_best[1]) + "," 
+#      + domain[2]["name"] + "=" + str(x_best[2]))
+
 print("The best parameters obtained:" 
       + domain[0]["name"] + "=" + str(x_best[0]) + "," 
-      + domain[1]["name"] + "=" + str(x_best[1]) + "," 
-      + domain[2]["name"] + "=" + str(x_best[2]) + "," 
-      + domain[3]["name"] + "=" + str(x_best[3]))
+      + domain[1]["name"] + "=" + str(x_best[1]))
 
-
+try:
+    opt.plot_acquisition()
+except:
+    pass
 #return x_best, architecture, hyperparameters
