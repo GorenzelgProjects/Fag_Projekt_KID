@@ -1,5 +1,5 @@
 #from autoencoder_1D import Epoch, EEGAutoencoder, EEGDataset,EEGDataset2, dataload, calc_convolution
-from AE_1D_T import Epoch, AET,AE, EEGDataset,EEGDataset2, dataload, calc_convolution
+from AE_1D_T import Epoch, AET,AE, EEGDataset,EEGDataset2, dataload, calc_convolution, dataload_init
 #from Save_BO import SaveData
 import matplotlib.pyplot as plt # plotting library
 import numpy as np # this module is useful to work with numerical arrays
@@ -14,6 +14,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 import GPyOpt
 
+path = "./AET_plots_BO"
+
+paradigm = False
+reject = True
 
 kernel = 3
 layers = 2
@@ -29,9 +33,9 @@ n = 12                   # Number of labels
 transfer = 0
 
 
-#nhead = tuple([4,8,16,32])
+nhead = tuple([4,8,16,32])
 learning_rate = (1*1e-5,1)
-weight_decay = (0.01,1)
+weight_decay = (1*1e-5,1)
 
 
 #encoded_space_dim = tuple([35,35])                      #Ranges
@@ -43,17 +47,19 @@ weight_decay = (0.01,1)
 #padding = tuple([0,1,2]) 
 #padding_p = tuple([0,0]) 
 
-#domain = [{'name': 'nhead', 'type': 'discrete', 'domain': nhead},                               #0         
-#          {'name': 'learning_rate', 'type': 'continuous', 'domain': learning_rate},               #1
-#          {'name': 'weight_decay', 'type': 'continuous', 'domain': weight_decay},                 #2
-#         ]
-
-domain = [{'name': 'learning_rate', 'type': 'continuous', 'domain': learning_rate},               #0
-          {'name': 'weight_decay', 'type': 'continuous', 'domain': weight_decay},                 #1
+domain = [{'name': 'nhead', 'type': 'discrete', 'domain': nhead},                               #0         
+          {'name': 'learning_rate', 'type': 'continuous', 'domain': learning_rate},               #1
+          {'name': 'weight_decay', 'type': 'continuous', 'domain': weight_decay},                 #2
          ]
 
-train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload(batch_size=batch_size, n=n, transfer=transfer)
-dataloader = train_loader
+#domain = [{'name': 'learning_rate', 'type': 'continuous', 'domain': learning_rate},               #0
+#          {'name': 'weight_decay', 'type': 'continuous', 'domain': weight_decay},                 #1
+ #        ]
+
+train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test = dataload_init(n=12, paradigm=paradigm, reject=reject)
+
+train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, test_dataset, target_labels = dataload(train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test, batch_size=batch_size, n=n, transfer=transfer)
+
 
 def objective_function(x):
     param = x[0]
@@ -81,12 +87,12 @@ def objective_function(x):
     #    criterion = nn.CrossEntropyLoss()
     
 
-    autoencoder = AE(encoder_list=0,
+    autoencoder = AET(encoder_list=0,
                 decoder_list=decoder_list, 
                 transformer_in=transformer_in,
                 in_channels = in_channels, 
                 out_channels = out_channels, 
-                nhead = 0,#int(param[0]), 
+                nhead = int(param[0]), 
                 layers=int(layers), 
                 kernel = int(kernel), 
                 kernel_p = int(kernel_p), 
@@ -103,8 +109,8 @@ def objective_function(x):
     #autoencoder = EEGAutoencoder()                                  #We've merely set these to 
     criterion = nn.L1Loss()
     #criterion = nn.MSELoss()
-    #optimizer = torch.optim.Adam(autoencoder.parameters(), lr=param[0],weight_decay=param[1])
-    optimizer = torch.optim.SGD(autoencoder.parameters(), lr=param[0],momentum=param[1])
+    #optimizer = torch.optim.Adam(autoencoder.parameters(), lr=param[1],weight_decay=param[2])
+    optimizer = torch.optim.SGD(autoencoder.parameters(), lr=param[1],momentum=param[2])
 
     autoencoder.to(device)
    
@@ -112,9 +118,9 @@ def objective_function(x):
     
     
 
-    model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=n)      
+    model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, criterion, optimizer, test_dataset, target_labels, n=n, PATH=path, paradigm=paradigm)      
     #model.to(device)
-    model.train(num_epochs=num_epochs) #dataloader, loss_fn, optimizer,n=10))
+    model.train(num_epochs=num_epochs, verbose=True) #dataloader, loss_fn, optimizer,n=10))
 
     test_loss = model.diz_loss['val_loss']
     test_loss = test_loss[-1]
@@ -135,14 +141,14 @@ x_best = opt.X[np.argmin(opt.Y)]
 print(x_best)
 
       
-#print("The best parameters obtained:" 
-#      + domain[0]["name"] + "=" + str(x_best[0]) + "," 
-#      + domain[1]["name"] + "=" + str(x_best[1]) + "," 
-#      + domain[2]["name"] + "=" + str(x_best[2]))
-
 print("The best parameters obtained:" 
       + domain[0]["name"] + "=" + str(x_best[0]) + "," 
-      + domain[1]["name"] + "=" + str(x_best[1]))
+      + domain[1]["name"] + "=" + str(x_best[1]) + "," 
+      + domain[2]["name"] + "=" + str(x_best[2]))
+
+#print("The best parameters obtained:" 
+#      + domain[0]["name"] + "=" + str(x_best[0]) + "," 
+#      + domain[1]["name"] + "=" + str(x_best[1]))
 
 try:
     opt.plot_acquisition()
