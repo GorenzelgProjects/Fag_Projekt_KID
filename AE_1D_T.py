@@ -569,6 +569,7 @@ def test_transfer(data,labels,n,transfer=0, target_bin=1, target_sub=31):
 
         if len(subs_data) > 0:
             avg[0,i-1,:,:] = subs_data[1:transfer+1,:,:].mean(axis=0)
+        
 
     #data = np.delete(data, sub_data, axis=0)
     #labels = np.delete(labels, sub_data, axis=0)
@@ -733,7 +734,7 @@ if __name__ == "__main__":
     pooling = True
     nhead = 8
 
-    num_epochs = 10
+    num_epochs = 2
     batch_size=32
     n = 12                   # Number of labels
     transfer = 0    # Number of test trials that needs to be transfer 
