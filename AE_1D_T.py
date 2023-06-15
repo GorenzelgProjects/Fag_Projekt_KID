@@ -516,7 +516,7 @@ def reject_subjects(data,labels,reject_list,test=False):
         end = 31
         add = 0
     
-    for i in tqdm(range(1,n+1)):
+    for i in tqdm(range(1,13)):
         bins = labels[np.where(labels[:,0] == i)]
         bins_data = data[np.where(labels[:,0] == i)]
         bin_idx = np.where(labels[:,0] == i)[0]
