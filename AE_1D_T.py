@@ -10,6 +10,7 @@ import seaborn as sns
 import os
 sns.set()
 import time
+from tqdm import tqdm
 
 class AET(nn.Module):
     def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], nhead=8, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
@@ -36,8 +37,13 @@ class AET(nn.Module):
             #nn.Tanh(),
         )
 
+<<<<<<< HEAD
+        self.transformer_encoder = nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[-1], dropout=0.1)
+        self.transformer_decoder = nn.TransformerDecoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[-1], dropout=0.1)
+=======
         self.transformer_encoder = nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1], dropout=0.2)
         self.transformer_decoder = nn.TransformerDecoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1], dropout=0.2)
+>>>>>>> 09bb505055d12aa4028fbb3b9c4e734d18a3089f
         
         #self.transformer_e = nn.Sequential(
          #   nn.TransformerEncoder(self.transformer_encoder, num_layers=3))
@@ -209,6 +215,7 @@ class Epoch:
 
     
     def train(self,num_epochs=2,verbose=False):
+        print("Initiating training...")
         self.diz_loss = {'train_loss':[],'val_loss':[]}
         for epoch in range(num_epochs):
             train_loss = self.train_epoch(verbose=verbose)
@@ -503,6 +510,40 @@ def paradigm_split(data,labels,n):
 
     return train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test
 
+def reject_subjects(data,labels,reject_list,test=False):
+
+    first_draw = True
+
+    if test:
+        end = 11
+        add = 30
+    else:
+        end = 31
+        add = 0
+    
+    for i in tqdm(range(1,n+1)):
+        bins = labels[np.where(labels[:,0] == i)]
+        bins_data = data[np.where(labels[:,0] == i)]
+        bin_idx = np.where(labels[:,0] == i)[0]
+        for j in range(1,end):
+            if j+add not in reject_list[i-1]:
+                subs = bins[np.where(bins[:,1] == j+add)]
+                subs_data = bins_data[np.where(bins[:,1] == j+add)]
+                sub_idx = bin_idx[np.where(bins[:,1] == j+add)]
+
+                if first_draw:
+                    transfer_data = subs_data
+                    transfer_labels = subs
+                    sub_data = sub_idx
+                    first_draw = False
+            
+                else:
+                    transfer_data = np.vstack((transfer_data, subs_data))
+                    transfer_labels = np.vstack((transfer_labels, subs))
+                    sub_data = np.append(sub_data, sub_idx)
+
+    return transfer_data, transfer_labels
+
 def test_transfer(data,labels,n,transfer=0, target_bin=1, target_sub=31):
     first_draw = True
     avg = np.zeros((1,n,35,256))
@@ -531,7 +572,8 @@ def test_transfer(data,labels,n,transfer=0, target_bin=1, target_sub=31):
             transfer_labels = np.vstack((transfer_labels, subs[1:transfer+1,:]))
             sub_data = np.append(sub_data, sub_idx[1:transfer+1])
 
-        avg[0,i-1,:,:] = subs_data[1:transfer+1,:,:].mean(axis=0)
+        if len(subs_data) > 0:
+            avg[0,i-1,:,:] = subs_data[1:transfer+1,:,:].mean(axis=0)
 
     #data = np.delete(data, sub_data, axis=0)
     #labels = np.delete(labels, sub_data, axis=0)
@@ -576,8 +618,8 @@ def plot_mse(avg, rec, transfer_list):
     plt.show()
 
 
-def dataload(batch_size = 32, n = 12, transfer = 0, paradigm = False):
-
+def dataload_init(n=12, paradigm=False, reject=False):
+    print("Loading Data from npy files")
     if paradigm:
         all_data = np.load("all_data.npy")
         all_labels = np.load("all_labels.npy").astype(np.int32)
@@ -600,22 +642,34 @@ def dataload(batch_size = 32, n = 12, transfer = 0, paradigm = False):
 
         avg, avg_labels = average(train_data, train_labels, n)
 
-        grand_avg = avg.mean(axis=0)
-
-        comb_avg = np.zeros_like(avg)
-        for i in range(len(avg)):
-            for j in range(len(grand_avg)):
-                temp_1 = np.expand_dims(avg[i,j,:,:], axis=0)
-                temp_2 = np.expand_dims(grand_avg[j,:,:], axis=0)
-                temp_avg = np.vstack((temp_1,temp_2))
-                comb_avg[i,j,:,:] = temp_avg.mean(axis=0)
-
-        #avg = comb_avg
-
         avg_test, avg_labels_test = average_2(test_data, test_labels, n)
 
+        reject_list = np.array([[0,0,0,1,16,5],
+                                [0,0,0,1,16,5],
+                                [0,0,0,1,16,5],
+                                [0,0,0,1,16,5],
+                                [0,0,0,0,0,7],
+                                [0,0,0,0,0,7],
+                                [0,7,9,10,12,28],
+                                [0,7,9,10,12,28],
+                                [0,0,0,0,0,40],
+                                [0,0,0,0,0,40],
+                                [6,9,10,30,35,40],
+                                [6,9,10,30,35,40]])
+
+        if reject:
+            print("Removing rejected subjects from train data")
+            train_data, train_labels = reject_subjects(train_data,train_labels,reject_list,test=False)
+            print("Removing rejected subjects from train data")
+            test_data, test_labels = reject_subjects(test_data,test_labels,reject_list,test=True)
+
+    return train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test
+
+
+def dataload(train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test, batch_size = 32, n = 12, transfer = 0):
+
     if transfer > 0:
-        for sub in range(31,41,1):
+        for sub in tqdm(range(31,41,1)):
             transfer_data, transfer_labels, transfer_avg_data, transfer_avg_labels, test_data, test_labels = test_transfer(data=test_data, labels=test_labels, n=n, transfer=transfer, target_bin=1, target_sub=sub)
             #print(transfer_data.shape[:])
             train_data = np.vstack((train_data, transfer_data))
@@ -624,8 +678,6 @@ def dataload(batch_size = 32, n = 12, transfer = 0, paradigm = False):
             avg_labels = np.vstack((avg_labels, transfer_avg_labels))
             test_data = test_data.copy()
             test_labels = test_labels.copy()
-        
-
 
     train_dataset = EEGDataset(train_data, train_labels)
     test_dataset = EEGDataset(test_data, test_labels)
@@ -665,9 +717,14 @@ def dataload(batch_size = 32, n = 12, transfer = 0, paradigm = False):
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size,shuffle=True)
 
     return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels
-    #return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test
 
 if __name__ == "__main__":
+
+    path = "./AET_plots"
+
+    paradigm = False
+    reject = True
+
     in_channels = [35,128]
     out_channels= [128,128]
 
@@ -680,24 +737,28 @@ if __name__ == "__main__":
     padding_p = 0
     pooling = True
     nhead = 8
-    num_epochs = 2
 
+    num_epochs = 10
     batch_size=32
     n = 12                   # Number of labels
     transfer = 0    # Number of test trials that needs to be transfer 
-    paradigm = False
-    #path = "./AE_plots"
-    path = "./AET_plots"
     
     encoder_list, decoder_list, transformer_in = calc_convolution(layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p, padding = padding, padding_p = padding_p, pooling = pooling) #Stride can't be change do to BO
     
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
+    train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test = dataload_init(n=12, paradigm=paradigm, reject=reject)
+
     mse_transfer = []
     mse_loss_list = []
     mse_avg_loss = []
+<<<<<<< HEAD
+    for i in range(10,30,10):
+        print("Transfering: {} trials from test data to train data ".format(i))
+=======
     for i in range(0,10,10):
         print("transfer: ", i)
+>>>>>>> 09bb505055d12aa4028fbb3b9c4e734d18a3089f
         transfer = i
         #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
         autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
@@ -708,10 +769,9 @@ if __name__ == "__main__":
         optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
         #optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
 
-        train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels = dataload(batch_size=batch_size, n=n, transfer=transfer, paradigm=paradigm)
-        dataloader = train_loader
+        train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, test_dataset, target_labels = dataload(train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test, batch_size=batch_size, n=n, transfer=transfer)
 
-        model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, criterion, optimizer, test_dataset, test_labels, n=n, PATH=path, paradigm=paradigm)   
+        model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, criterion, optimizer, test_dataset, target_labels, n=n, PATH=path, paradigm=paradigm)   
         model2 = model.train(num_epochs=num_epochs, verbose=True) #dataloader, loss_fn, optimizer,n=10))
 
         if i > 0:
