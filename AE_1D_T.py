@@ -37,13 +37,8 @@ class AET(nn.Module):
             #nn.Tanh(),
         )
 
-<<<<<<< HEAD
         self.transformer_encoder = nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[-1], dropout=0.1)
         self.transformer_decoder = nn.TransformerDecoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[-1], dropout=0.1)
-=======
-        self.transformer_encoder = nn.TransformerEncoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1], dropout=0.2)
-        self.transformer_decoder = nn.TransformerDecoderLayer(d_model=transformer_in, nhead=nhead, dim_feedforward=out_channels[1], dropout=0.2)
->>>>>>> 09bb505055d12aa4028fbb3b9c4e734d18a3089f
         
         #self.transformer_e = nn.Sequential(
          #   nn.TransformerEncoder(self.transformer_encoder, num_layers=3))
@@ -752,13 +747,8 @@ if __name__ == "__main__":
     mse_transfer = []
     mse_loss_list = []
     mse_avg_loss = []
-<<<<<<< HEAD
     for i in range(10,30,10):
         print("Transfering: {} trials from test data to train data ".format(i))
-=======
-    for i in range(0,10,10):
-        print("transfer: ", i)
->>>>>>> 09bb505055d12aa4028fbb3b9c4e734d18a3089f
         transfer = i
         #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
         autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
