@@ -204,8 +204,50 @@ class Epoch:
 
                 loss = self.loss_fn(avg_outputs_test, outputs_device)  # Reconstruction loss
                 test_loss.append(loss.item())
-
+                
             return np.mean(test_loss)
+
+    def test_epoch_2(self):
+        # Set evaluation mode for encoder and decoder
+        with torch.no_grad(): # No need to track the gradients
+            # Define the lists to store the outputs for each batch
+            test_loss = []
+            paradigm_1 = []
+            paradigm_2 = []
+            paradigm_3 = []
+            paradigm_4 = []
+            paradigm_5 = []
+            for test_data in self.test_loader:
+                inputs, label = test_data  # Assuming your dataloader provides (input, label) pairs
+                #inputs = inputs.swapaxes(0,1)
+                inputs = inputs.to(self.device)
+
+                avg_outputs_test = self.avg_dataset_test[:][0]
+        
+                avg_outputs_test = avg_outputs_test[label[:,1]-self.sub_diff,label[:,0]-self.bin_diff].to(self.device)
+
+                outputs = self.model(inputs)
+
+                outputs_device = outputs.to(self.device)
+
+                for i, l in enumerate(label):
+                    loss = self.loss_fn(avg_outputs_test[i], outputs_device[i])
+
+                    if l[0] <= 4:
+                        paradigm_1.append(loss.item())
+                    elif l[0] == 5 or l[0] == 6:
+                        paradigm_2.append(loss.item())
+                    elif l[0] == 7 or l[0] == 8:
+                        paradigm_3.append(loss.item())
+                    elif l[0] == 9 or l[0] == 10:
+                        paradigm_4.append(loss.item())
+                    else:
+                        paradigm_5.append(loss.item())
+
+                #loss = self.loss_fn(avg_outputs_test, outputs_device)  # Reconstruction loss
+                #test_loss.append(loss.item())
+
+            return  [np.mean(paradigm_1), np.var(paradigm_1), np.std(paradigm_1)], [np.mean(paradigm_2), np.var(paradigm_2), np.std(paradigm_1)], [np.mean(paradigm_3), np.var(paradigm_3), np.std(paradigm_1)], [np.mean(paradigm_4), np.var(paradigm_4), np.std(paradigm_1)], [np.mean(paradigm_5), np.var(paradigm_5), np.std(paradigm_1)]
 
 
     
@@ -553,26 +595,27 @@ def test_transfer(data,labels,n,transfer=0, target_bin=1, target_sub=31):
 
         sub_idx = bin_idx[np.where(bins[:,1] == target_sub)]
 
+        
 
         subs_data = bins_data[np.where(bins[:,1] == target_sub)]
         avg_labels[0,0] = i
         avg_labels[0,1] = target_sub
-        if first_draw:
-            transfer_data = subs_data[1:transfer+1,:,:]
-            transfer_labels = subs[1:transfer+1,:]
-            sub_data = sub_idx[1:transfer+1]
-            first_draw = False
-        else:
-            transfer_data = np.vstack((transfer_data, subs_data[1:transfer+1,:,:]))
-            transfer_labels = np.vstack((transfer_labels, subs[1:transfer+1,:]))
-            sub_data = np.append(sub_data, sub_idx[1:transfer+1])
 
         if len(subs_data) > 0:
-            avg[0,i-1,:,:] = subs_data[1:transfer+1,:,:].mean(axis=0)
-        
 
-    #data = np.delete(data, sub_data, axis=0)
-    #labels = np.delete(labels, sub_data, axis=0)
+            random_idx = np.random.choice(subs_data.shape[0], transfer, replace=False)
+
+            if first_draw:
+                transfer_data = subs_data[random_idx,:,:]
+                transfer_labels = subs[random_idx,:]
+                #sub_data = sub_idx[random_idx]
+                first_draw = False
+            else:
+                transfer_data = np.vstack((transfer_data, subs_data[random_idx,:,:]))
+                transfer_labels = np.vstack((transfer_labels, subs[random_idx,:]))
+                #sub_data = np.append(sub_data, sub_idx[random_idx])
+
+            avg[0,i-1,:,:] = subs_data[random_idx,:,:].mean(axis=0)
 
 
     return transfer_data, transfer_labels, avg, avg_labels, data, labels
@@ -732,10 +775,10 @@ if __name__ == "__main__":
     padding = 1
     padding_p = 0
     pooling = True
-    nhead = 8
+    nhead = 16 # 16
 
-    num_epochs = 2
-    batch_size=32
+    num_epochs = 10
+    batch_size = 32
     n = 12                   # Number of labels
     transfer = 0    # Number of test trials that needs to be transfer 
     
@@ -744,11 +787,25 @@ if __name__ == "__main__":
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test = dataload_init(n=12, paradigm=paradigm, reject=reject)
-
+ 
     mse_transfer = []
     mse_loss_list = []
     mse_avg_loss = []
-    for i in range(10,30,10):
+
+    paradigm_1 = []
+    paradigm_2 = []
+    paradigm_3 = []
+    paradigm_4 = []
+    paradigm_5 = []
+
+
+    avg_paradigm_1 = []
+    avg_paradigm_2 = []
+    avg_paradigm_3 = []
+    avg_paradigm_4 = []
+    avg_paradigm_5 = []    
+    
+    for i in range(5,35,5):
         print("Transfering: {} trials from test data to train data ".format(i))
         transfer = i
         #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
@@ -757,13 +814,46 @@ if __name__ == "__main__":
         #criterion = nn.L1Loss()
         criterion = nn.MSELoss()
         #criterion = nn.BCELoss()
-        optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
-        #optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
+        #optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
+        optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.26, momentum=0.14)
+
+        temp_avg_1, temp_avg_2, temp_avg_3, temp_avg_4, temp_avg_5 = [], [], [], [], []
 
         train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, test_dataset, target_labels = dataload(train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test, batch_size=batch_size, n=n, transfer=transfer)
+        true_avg = avg_dataset_test[:][0].to(device)
+        transfer_avg = avg_dataset[30:][0].to(device)
+        for i,s in enumerate(transfer_avg):
+            for j,b in enumerate(s):
+                loss = criterion(true_avg[i,j], b)
+                if loss.item() != 0:
+                    if j+1 <= 4:
+                        temp_avg_1.append(loss.item())
+                    elif j+1 == 5 or j+1 == 6:
+                        temp_avg_2.append(loss.item())
+                    elif j+1 == 7 or j+1 == 8:
+                        temp_avg_3.append(loss.item())
+                    elif j+1 == 9 or j+1 == 10:
+                        temp_avg_4.append(loss.item())
+                    else:
+                        temp_avg_5.append(loss.item())
+
+        avg_paradigm_1.append([np.mean(temp_avg_1),np.var(temp_avg_1),np.std(temp_avg_1)])
+        avg_paradigm_2.append([np.mean(temp_avg_2),np.var(temp_avg_2),np.std(temp_avg_2)])
+        avg_paradigm_3.append([np.mean(temp_avg_3),np.var(temp_avg_3),np.std(temp_avg_3)])
+        avg_paradigm_4.append([np.mean(temp_avg_4),np.var(temp_avg_4),np.std(temp_avg_4)])
+        avg_paradigm_5.append([np.mean(temp_avg_5),np.var(temp_avg_5),np.std(temp_avg_5)])
+
+        #print(avg_paradigm_1)
 
         model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, criterion, optimizer, test_dataset, target_labels, n=n, PATH=path, paradigm=paradigm)   
         model2 = model.train(num_epochs=num_epochs, verbose=True) #dataloader, loss_fn, optimizer,n=10))
+        (p1, p2, p3, p4, p5) = model.test_epoch_2()
+        
+        paradigm_1.append(p1)
+        paradigm_2.append(p2)
+        paradigm_3.append(p3)
+        paradigm_4.append(p4)
+        paradigm_5.append(p5)
 
         if i > 0:
             
@@ -772,8 +862,30 @@ if __name__ == "__main__":
 
             true_avg = avg_dataset_test[:][0].to(device)
             transfer_avg = avg_dataset[30:][0].to(device)
-
+            
             loss = criterion(true_avg, transfer_avg)  # Reconstruction loss
             mse_avg_loss.append(loss.item())
 
-    plot_mse(mse_avg_loss, mse_loss_list, mse_transfer)
+
+    print("p1 (mean,var,std): {}".format(paradigm_1))
+    print("-"*30)
+    print("p2 (mean,var,std): {}".format(paradigm_2))
+    print("-"*30)
+    print("p3 (mean,var,std): {}".format(paradigm_3))
+    print("-"*30)
+    print("p4 (mean,var,std): {}".format(paradigm_4))
+    print("-"*30)
+    print("p5 (mean,var,std): {}".format(paradigm_5))
+    print("_"*30)
+
+    print("avg1 (mean,var,std): {}".format(avg_paradigm_1))
+    print("-"*30)
+    print("avg2 (mean,var,std): {}".format(avg_paradigm_2))
+    print("-"*30)
+    print("avg3 (mean,var,std): {}".format(avg_paradigm_3))
+    print("-"*30)
+    print("avg4 (mean,var,std): {}".format(avg_paradigm_4))
+    print("-"*30)
+    print("avg5 (mean,var,std): {}".format(avg_paradigm_5))
+
+    #plot_mse(mse_avg_loss, mse_loss_list, mse_transfer)
