@@ -488,6 +488,9 @@ def average_2(data,labels,n):
     return avg, avg_labels
 
 def paradigm_split(data,labels,n):
+    
+    print("Splitting data into paradigms")
+    
     first_draw = True
     first_test = True
     
@@ -498,47 +501,50 @@ def paradigm_split(data,labels,n):
     avg_labels_test = np.zeros((40,2))
     
     #for i in range(1,n+1):
-    for i in range(1,n+1):
+    for i in tqdm(range(1,n+1)):
         
             
-        subs = labels[np.where(labels[:,0] == i)]
-
-        sub_idx = np.where(labels[:,0] == i)[0]
-        subs_data = data[np.where(labels[:,0] == i)]
+        bins = labels[np.where(labels[:,0] == i)]
+        bins_data = data[np.where(labels[:,0] == i)]
 
         #avg_labels[0,0] = i
         #avg_labels[0,1] = target_sub
-        
-        if i > 10:
-            if first_test:
-                test_data = subs_data
-                test_labels = subs
-                sub_data = sub_idx
-                first_test = False
-            else:
-                test_data = np.vstack((test_data, subs_data))
-                test_labels = np.vstack((test_labels, subs))
-                sub_data = np.append(sub_data, sub_idx)
-                
-            avg_test[:,i-11,:,:] = subs_data.mean(axis=0)
+        for j in range(1,41):
+            subs = bins[np.where(bins[:,1] == j)]
+            subs_data = bins_data[np.where(bins[:,1] == j)]
+            #avg_labels[j-1,0] = i
+            #avg_labels[j-1,1] = j
+            #mean = subs_data.mean(axis=0)
+
             
-            for j in range(1,41):
+            #avg[j-1,i-1,:,:] = mean
+        
+            if i > 10:
+                if first_test:
+                    test_data = subs_data
+                    test_labels = subs
+                    first_test = False
+                else:
+                    test_data = np.vstack((test_data, subs_data))
+                    test_labels = np.vstack((test_labels, subs))
+                    
+                avg_test[j-1,i-11,:,:] = subs_data.mean(axis=0)
+                
+                #for j in range(1,41):
                 avg_labels_test[j-1,0] = i
                 avg_labels_test[j-1,1] = j
-        else:
-            if first_draw:
-                train_data = subs_data
-                train_labels = subs
-                sub_data = sub_idx
-                first_draw = False
             else:
-                train_data = np.vstack((train_data, subs_data))
-                train_labels = np.vstack((train_labels, subs))
-                sub_data = np.append(sub_data, sub_idx)
-            
-            avg[:,i-1,:,:] = subs_data.mean(axis=0)
-            
-            for j in range(1,41):
+                if first_draw:
+                    train_data = subs_data
+                    train_labels = subs
+                    first_draw = False
+                else:
+                    train_data = np.vstack((train_data, subs_data))
+                    train_labels = np.vstack((train_labels, subs))
+                    
+                avg[j-1,i-1,:,:] = subs_data.mean(axis=0)
+                
+                #for j in range(1,41):
                 avg_labels[j-1,0] = i
                 avg_labels[j-1,1] = j
 
@@ -547,7 +553,7 @@ def paradigm_split(data,labels,n):
 
     return train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test
 
-def reject_subjects(data,labels,reject_list,test=False):
+def reject_subjects(data,labels,reject_list,test=False, paradigm=False):
 
     first_draw = True
 
@@ -556,6 +562,10 @@ def reject_subjects(data,labels,reject_list,test=False):
         add = 30
     else:
         end = 31
+        add = 0
+    
+    if paradigm:
+        end = 41
         add = 0
     
     for i in tqdm(range(1,13)):
@@ -659,6 +669,20 @@ def plot_mse(avg, rec, transfer_list):
 
 def dataload_init(n=12, paradigm=False, reject=False):
     print("Loading Data from npy files")
+    
+    reject_list = np.array([[0,0,0,1,16,5],
+                                [0,0,0,1,16,5],
+                                [0,0,0,1,16,5],
+                                [0,0,0,1,16,5],
+                                [0,0,0,0,0,7],
+                                [0,0,0,0,0,7],
+                                [0,7,9,10,12,28],
+                                [0,7,9,10,12,28],
+                                [0,0,0,0,0,40],
+                                [0,0,0,0,0,40],
+                                [6,9,10,30,35,40],
+                                [6,9,10,30,35,40]])
+    
     if paradigm:
         all_data = np.load("all_data.npy")
         all_labels = np.load("all_labels.npy").astype(np.int32)
@@ -667,6 +691,13 @@ def dataload_init(n=12, paradigm=False, reject=False):
         
         train_data = train_data*1e5
         test_data = test_data*1e5
+        print("Paradigm ",train_data.shape[:])
+        
+        if reject:
+            print("Removing rejected subjects from train data")
+            train_data, train_labels = reject_subjects(train_data,train_labels,reject_list,test=False,paradigm=True)
+            print("Removing rejected subjects from test data")
+            test_data, test_labels = reject_subjects(test_data,test_labels,reject_list,test=True,paradigm=True)
         
         print("Paradigm ",train_data.shape[:])
 
@@ -683,24 +714,13 @@ def dataload_init(n=12, paradigm=False, reject=False):
 
         avg_test, avg_labels_test = average_2(test_data, test_labels, n)
 
-        reject_list = np.array([[0,0,0,1,16,5],
-                                [0,0,0,1,16,5],
-                                [0,0,0,1,16,5],
-                                [0,0,0,1,16,5],
-                                [0,0,0,0,0,7],
-                                [0,0,0,0,0,7],
-                                [0,7,9,10,12,28],
-                                [0,7,9,10,12,28],
-                                [0,0,0,0,0,40],
-                                [0,0,0,0,0,40],
-                                [6,9,10,30,35,40],
-                                [6,9,10,30,35,40]])
+        
 
         if reject:
             print("Removing rejected subjects from train data")
-            train_data, train_labels = reject_subjects(train_data,train_labels,reject_list,test=False)
-            print("Removing rejected subjects from train data")
-            test_data, test_labels = reject_subjects(test_data,test_labels,reject_list,test=True)
+            train_data, train_labels = reject_subjects(train_data,train_labels,reject_list,test=False,paradigm=False)
+            print("Removing rejected subjects from test data")
+            test_data, test_labels = reject_subjects(test_data,test_labels,reject_list,test=True,paradigm=False)
 
     return train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test
 
@@ -761,7 +781,7 @@ if __name__ == "__main__":
 
     path = "./AET_plots"
 
-    paradigm = False
+    paradigm = True
     reject = True
 
     in_channels = [35,128]
@@ -775,9 +795,9 @@ if __name__ == "__main__":
     padding = 1
     padding_p = 0
     pooling = True
-    nhead = 16 # 16
+    nhead = 4 # 16
 
-    num_epochs = 10
+    num_epochs = 2
     batch_size = 32
     n = 12                   # Number of labels
     transfer = 0    # Number of test trials that needs to be transfer 
@@ -805,9 +825,9 @@ if __name__ == "__main__":
     avg_paradigm_4 = []
     avg_paradigm_5 = []    
     
-    for i in range(5,35,5):
+    for t in range(0,5,5):
         print("Transfering: {} trials from test data to train data ".format(i))
-        transfer = i
+        transfer = t
         #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
         autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
         autoencoder.to(device)
@@ -820,42 +840,45 @@ if __name__ == "__main__":
         temp_avg_1, temp_avg_2, temp_avg_3, temp_avg_4, temp_avg_5 = [], [], [], [], []
 
         train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, test_dataset, target_labels = dataload(train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test, batch_size=batch_size, n=n, transfer=transfer)
-        true_avg = avg_dataset_test[:][0].to(device)
-        transfer_avg = avg_dataset[30:][0].to(device)
-        for i,s in enumerate(transfer_avg):
-            for j,b in enumerate(s):
-                loss = criterion(true_avg[i,j], b)
-                if loss.item() != 0:
-                    if j+1 <= 4:
-                        temp_avg_1.append(loss.item())
-                    elif j+1 == 5 or j+1 == 6:
-                        temp_avg_2.append(loss.item())
-                    elif j+1 == 7 or j+1 == 8:
-                        temp_avg_3.append(loss.item())
-                    elif j+1 == 9 or j+1 == 10:
-                        temp_avg_4.append(loss.item())
-                    else:
-                        temp_avg_5.append(loss.item())
+        
+        if not paradigm:
+            true_avg = avg_dataset_test[:][0].to(device)
+            transfer_avg = avg_dataset[30:][0].to(device)
+            for i,s in enumerate(transfer_avg):
+                for j,b in enumerate(s):
+                    loss = criterion(true_avg[i,j], b)
+                    if loss.item() != 0:
+                        if j+1 <= 4:
+                            temp_avg_1.append(loss.item())
+                        elif j+1 == 5 or j+1 == 6:
+                            temp_avg_2.append(loss.item())
+                        elif j+1 == 7 or j+1 == 8:
+                            temp_avg_3.append(loss.item())
+                        elif j+1 == 9 or j+1 == 10:
+                            temp_avg_4.append(loss.item())
+                        else:
+                            temp_avg_5.append(loss.item())
 
-        avg_paradigm_1.append([np.mean(temp_avg_1),np.var(temp_avg_1),np.std(temp_avg_1)])
-        avg_paradigm_2.append([np.mean(temp_avg_2),np.var(temp_avg_2),np.std(temp_avg_2)])
-        avg_paradigm_3.append([np.mean(temp_avg_3),np.var(temp_avg_3),np.std(temp_avg_3)])
-        avg_paradigm_4.append([np.mean(temp_avg_4),np.var(temp_avg_4),np.std(temp_avg_4)])
-        avg_paradigm_5.append([np.mean(temp_avg_5),np.var(temp_avg_5),np.std(temp_avg_5)])
+            avg_paradigm_1.append([np.mean(temp_avg_1),np.var(temp_avg_1),np.std(temp_avg_1)])
+            avg_paradigm_2.append([np.mean(temp_avg_2),np.var(temp_avg_2),np.std(temp_avg_2)])
+            avg_paradigm_3.append([np.mean(temp_avg_3),np.var(temp_avg_3),np.std(temp_avg_3)])
+            avg_paradigm_4.append([np.mean(temp_avg_4),np.var(temp_avg_4),np.std(temp_avg_4)])
+            avg_paradigm_5.append([np.mean(temp_avg_5),np.var(temp_avg_5),np.std(temp_avg_5)])
 
         #print(avg_paradigm_1)
 
         model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, criterion, optimizer, test_dataset, target_labels, n=n, PATH=path, paradigm=paradigm)   
         model2 = model.train(num_epochs=num_epochs, verbose=True) #dataloader, loss_fn, optimizer,n=10))
-        (p1, p2, p3, p4, p5) = model.test_epoch_2()
+        if not paradigm:
+            (p1, p2, p3, p4, p5) = model.test_epoch_2()
         
-        paradigm_1.append(p1)
-        paradigm_2.append(p2)
-        paradigm_3.append(p3)
-        paradigm_4.append(p4)
-        paradigm_5.append(p5)
+            paradigm_1.append(p1)
+            paradigm_2.append(p2)
+            paradigm_3.append(p3)
+            paradigm_4.append(p4)
+            paradigm_5.append(p5)
 
-        if i > 0:
+        if transfer > 0:
             
             mse_transfer.append(i)
             mse_loss_list.append(model.diz_loss['val_loss'][-1])
@@ -888,4 +911,4 @@ if __name__ == "__main__":
     print("-"*30)
     print("avg5 (mean,var,std): {}".format(avg_paradigm_5))
 
-    #plot_mse(mse_avg_loss, mse_loss_list, mse_transfer)
+    plot_mse(mse_avg_loss, mse_loss_list, mse_transfer)
