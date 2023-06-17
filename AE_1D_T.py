@@ -668,7 +668,11 @@ def plot_mse(avg, rec, transfer_list):
 
 
 def dataload_init(n=12, paradigm=False, reject=False):
+<<<<<<< HEAD
     print("Loading data from npy files")
+=======
+    print("Loading Data from npy files")
+>>>>>>> 08f5c14e71a154a21e3939e565024e1061f26270
     
     reject_list = np.array([[0,0,0,1,16,5],
                                 [0,0,0,1,16,5],
@@ -781,7 +785,7 @@ if __name__ == "__main__":
 
     path = "./AET_plots"
 
-    paradigm = False
+    paradigm = True
     reject = True
 
     in_channels = [35,128]
@@ -838,8 +842,13 @@ if __name__ == "__main__":
     avg_paradigm_4 = []
     avg_paradigm_5 = []    
     
+<<<<<<< HEAD
     for t in range(30,35,5):
         print("Transfering: {} trials from test data to train data ".format(t))
+=======
+    for t in range(0,5,5):
+        print("Transfering: {} trials from test data to train data ".format(i))
+>>>>>>> 08f5c14e71a154a21e3939e565024e1061f26270
         transfer = t
         #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
         autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
@@ -860,7 +869,11 @@ if __name__ == "__main__":
             for i,s in enumerate(transfer_avg):
                 for j,b in enumerate(s):
                     loss = criterion(true_avg[i,j], b)
+<<<<<<< HEAD
                     if loss.item() != 0 and i+31 not in reject_list[j]:
+=======
+                    if loss.item() != 0:
+>>>>>>> 08f5c14e71a154a21e3939e565024e1061f26270
                         if j+1 <= 4:
                             temp_avg_1.append(loss.item())
                         elif j+1 == 5 or j+1 == 6:
@@ -871,7 +884,11 @@ if __name__ == "__main__":
                             temp_avg_4.append(loss.item())
                         else:
                             temp_avg_5.append(loss.item())
+<<<<<<< HEAD
             print(temp_avg_5)
+=======
+
+>>>>>>> 08f5c14e71a154a21e3939e565024e1061f26270
             avg_paradigm_1.append([np.mean(temp_avg_1),np.var(temp_avg_1),np.std(temp_avg_1)])
             avg_paradigm_2.append([np.mean(temp_avg_2),np.var(temp_avg_2),np.std(temp_avg_2)])
             avg_paradigm_3.append([np.mean(temp_avg_3),np.var(temp_avg_3),np.std(temp_avg_3)])
