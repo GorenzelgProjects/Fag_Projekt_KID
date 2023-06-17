@@ -781,7 +781,7 @@ if __name__ == "__main__":
 
     path = "./AET_plots"
 
-    paradigm = True
+    paradigm = False
     reject = True
 
     in_channels = [35,128]
@@ -795,9 +795,9 @@ if __name__ == "__main__":
     padding = 1
     padding_p = 0
     pooling = True
-    nhead = 4 # 16
+    nhead = 16 # 16
 
-    num_epochs = 2
+    num_epochs = 10
     batch_size = 32
     n = 12                   # Number of labels
     transfer = 0    # Number of test trials that needs to be transfer 
@@ -871,7 +871,7 @@ if __name__ == "__main__":
                             temp_avg_4.append(loss.item())
                         else:
                             temp_avg_5.append(loss.item())
-            print(temp_avg_5)
+
             avg_paradigm_1.append([np.mean(temp_avg_1),np.var(temp_avg_1),np.std(temp_avg_1)])
             avg_paradigm_2.append([np.mean(temp_avg_2),np.var(temp_avg_2),np.std(temp_avg_2)])
             avg_paradigm_3.append([np.mean(temp_avg_3),np.var(temp_avg_3),np.std(temp_avg_3)])
