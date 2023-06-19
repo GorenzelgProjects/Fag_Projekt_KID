@@ -12,6 +12,14 @@ sns.set()
 import time
 from tqdm import tqdm
 
+
+'''This file contains our main models, main datahandling and main plotting. This file is both used by itself to do single trainings
+and transfer training and to be exported to other file such as "AE_1D_BO_T t.py" to do the BO training loops. In the bottom of the
+file, there's a "if name == main" part, only runs when running directly from this file.'''
+
+
+'''Main Transformer enchanced CAE model. Set up as a class for easier call. The input in the initiator is pretty straight forward.'''
+
 class AET(nn.Module):
     def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], nhead=8, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
         super(AET, self).__init__()
@@ -80,6 +88,10 @@ class AET(nn.Module):
         decoded = self.decoder(transform_d)
         return decoded
 
+'''Main CAE model. Set up as a class for easier call. The input in the initiator is pretty straight forward and is very alike
+the above model (TECAE).'''
+
+
 class AE(nn.Module):
     def __init__(self,encoder_list=0,decoder_list=0, transformer_in=0, in_channels=[35,64], out_channels=[64,128], nhead=0, layers=3, kernel = 3, kernel_p = 2, stride = 1, stride_p = 2,padding = 1, padding_p = 0, pooling = True):
         super(AE, self).__init__()
@@ -130,6 +142,9 @@ class AE(nn.Module):
         decoded = self.decoder(encoded)
         return decoded
 
+
+'''The main training class. Handles both the training and test over x-epochs, but also have data-loading-, data-sorting-
+and plotting functions'''
 
 class Epoch:
     
@@ -257,7 +272,7 @@ class Epoch:
         for epoch in range(num_epochs):
             train_loss = self.train_epoch(verbose=verbose)
             val_loss = self.test_epoch()
-            print('\n EPOCH {}/{} \t train loss {} \t val loss {}'.format(epoch + 1, num_epochs,train_loss,val_loss))
+            print('\n EPOCH {}/{} \t train loss {} \t test loss {}'.format(epoch + 1, num_epochs,train_loss,val_loss))
             self.diz_loss['train_loss'].append(train_loss)
             self.diz_loss['val_loss'].append(val_loss)
 
@@ -408,7 +423,7 @@ class Epoch:
         # Plot losses
         plt.figure(figsize=(10,8))
         plt.semilogy(self.diz_loss['train_loss'], label='Train')
-        plt.semilogy(self.diz_loss['val_loss'], label='Valid')
+        plt.semilogy(self.diz_loss['val_loss'], label='Test')
         plt.xlabel('Epoch')
         plt.ylabel('Average Loss')
         #plt.grid()
@@ -777,15 +792,18 @@ def dataload(train_data, train_labels, test_data, test_labels, avg, avg_labels, 
 
     return train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg, avg_test, test_dataset, test_labels
 
+
+'''This part is only run, when running this specific .py file. Used for single training runs, transfer training and paradigm-based training.'''
+
 if __name__ == "__main__":
 
-    path = "./AET_plots"
+    path = "./AET_plots_til_martin"           #The plots will be saved at this relative path in a folder with the given name.
 
-    paradigm = False
-    reject = True
+    paradigm = False            #Set to true if we want to train over paradigms
+    reject = True               #Set to true if we want to rejects "bad" subject/datapoints
 
-    in_channels = [35,128]
-    out_channels= [128,128]
+    in_channels = [35,128]      #fixed input channels
+    out_channels= [128,128]     #fixed ouput channels
 
     layers=2
     kernel = 3
@@ -794,15 +812,15 @@ if __name__ == "__main__":
     stride_p = 2
     padding = 1
     padding_p = 0
-    pooling = True
-    nhead = 16 # 16
+    pooling = True              #Set to true for maxpooling
+    nhead = 16                  #Number of attention heads
 
-    num_epochs = 10
-    batch_size = 32
-    n = 12                   # Number of labels
-    transfer = 0    # Number of test trials that needs to be transfer 
+    num_epochs = 10             #Number of epochs
+    batch_size = 32             
+    n = 12                      #Number of labels
+    transfer = 0                #Number of test trials that needs to be transfer 
 
-    reject_list = np.array([[0,0,0,1,16,5],
+    reject_list = np.array([[0,0,0,1,16,5],         #List of rejected subjects in the format of the data.
                                 [0,0,0,1,16,5],
                                 [0,0,0,1,16,5],
                                 [0,0,0,1,16,5],
@@ -817,10 +835,13 @@ if __name__ == "__main__":
     
     encoder_list, decoder_list, transformer_in = calc_convolution(layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p, padding = padding, padding_p = padding_p, pooling = pooling) #Stride can't be change do to BO
     
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")         #Autoselecting cuda/cpu
 
-    train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test = dataload_init(n=12, paradigm=paradigm, reject=reject)
- 
+    train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test = dataload_init(n=12, paradigm=paradigm, reject=reject)            #Data initiator
+    
+    print(train_data.shape)
+    print(test_data.shape)
+
     mse_transfer = []
     mse_loss_list = []
     mse_avg_loss = []
@@ -838,21 +859,24 @@ if __name__ == "__main__":
     avg_paradigm_4 = []
     avg_paradigm_5 = []    
     
-    for t in range(30,35,5):
+    for t in range(0,5,5):          #Transfor training loop. set to (range(0,5,5)) to do not transfer and a single training.
         print("Transfering: {} trials from test data to train data ".format(t))
         transfer = t
+
+                    #Below are different optimizer / loss setting. Change comments to choose the appropiate settings.
+
         #autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
         autoencoder = AET(encoder_list=encoder_list,decoder_list=decoder_list, transformer_in=transformer_in, in_channels=in_channels, out_channels=out_channels, nhead=nhead, layers=layers, kernel = kernel, kernel_p = kernel_p, stride = stride, stride_p = stride_p,padding = padding, padding_p = padding_p, pooling = pooling)
         autoencoder.to(device)
         #criterion = nn.L1Loss()
         criterion = nn.MSELoss()
         #criterion = nn.BCELoss()
-        #optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
-        optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.26, momentum=0.14)
+        optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
+        #optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.01, momentum=0.9)
 
         temp_avg_1, temp_avg_2, temp_avg_3, temp_avg_4, temp_avg_5 = [], [], [], [], []
 
-        train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, test_dataset, target_labels = dataload(train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test, batch_size=batch_size, n=n, transfer=transfer)
+        train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, test_dataset, target_labels = dataload(train_data, train_labels, test_data, test_labels, avg, avg_labels, avg_test, avg_labels_test, batch_size=batch_size, n=n, transfer=transfer)        #Trainloader functions 
         
         if not paradigm:
             true_avg = avg_dataset_test[:][0].to(device)
@@ -880,8 +904,8 @@ if __name__ == "__main__":
 
         #print(avg_paradigm_1)
 
-        model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, criterion, optimizer, test_dataset, target_labels, n=n, PATH=path, paradigm=paradigm)   
-        model2 = model.train(num_epochs=num_epochs, verbose=True) #dataloader, loss_fn, optimizer,n=10))
+        model = Epoch(autoencoder, device, train_loader, valid_loader, test_loader, avg_dataset, avg_dataset_test, avg_target, avg_test_target, criterion, optimizer, test_dataset, target_labels, n=n, PATH=path, paradigm=paradigm)       #Loading model with the given settings as inputs        
+        model2 = model.train(num_epochs=num_epochs, verbose=True) #dataloader, loss_fn, optimizer,n=10))            #Train function. set verbose to True if we want plots for individual training loops
         if not paradigm:
             (p1, p2, p3, p4, p5) = model.test_epoch_2()
         
